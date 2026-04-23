@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, Response
 import requests
 import os
+import glob
 
 app = Flask(__name__)
 
@@ -8,12 +9,13 @@ WINDSOR_KEY = 'af49eacb41a92fa489a714e8dd18c47d8114'
 
 @app.route('/')
 def index():
-    # Tenta encontrar o index.html independente do nome
-    static_dir = os.path.join(os.path.dirname(__file__), 'static')
-    for fname in os.listdir(static_dir):
-        if fname.lower().endswith('.html'):
-            return send_file(os.path.join(static_dir, fname))
-    return 'Dashboard não encontrado', 404
+    base = os.path.dirname(os.path.abspath(__file__))
+    # Procura qualquer HTML na pasta static e subpastas
+    files = glob.glob(os.path.join(base, '**', '*.html'), recursive=True)
+    if files:
+        with open(files[0], 'r', encoding='utf-8') as f:
+            return Response(f.read(), mimetype='text/html')
+    return f'Nenhum HTML encontrado. Base: {base}, Arquivos: {os.listdir(base)}', 404
 
 @app.route('/api/windsor')
 def windsor():
