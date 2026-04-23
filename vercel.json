@@ -1,5 +1,7 @@
 {
   "functions": {
-    "api/ads.js": { "runtime": "edge" }
+    "api/ads.js": {
+      "runtime": "nodejs20.x"
+    }
   }
 }
