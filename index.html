@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kambai — Resultado do Dia</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f2ee;--surface:#fff;--s2:#f0ece8;--border:#e2d9d0;
+  --text:#1a1210;--t2:#7a6b62;--t3:#b0a098;
+  --accent:#c4602a;--green:#2d7a3a;--amber:#a06010;--red:#a02828;
+  --green-bg:#eaf5ec;--amber-bg:#fdf3e0;--red-bg:#faeaea;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+.logo{font-size:15px;font-weight:700;letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
+.badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.dot.spin{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.refresh-btn{padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--text);font-size:12px;cursor:pointer;font-weight:500}
+.refresh-btn:disabled{opacity:.4;cursor:default}
+.wrap{max-width:980px;margin:0 auto;padding:24px 20px}
+.date-txt{font-size:13px;color:var(--t2);margin-bottom:20px}
+.manual-card{background:var(--surface);border:1.5px solid var(--accent);border-radius:16px;padding:20px 24px;margin-bottom:24px}
+.manual-card h2{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
+.mfields{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end}
+.mf{display:flex;flex-direction:column;gap:5px}
+.mf label{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.04em}
+.mrow{display:flex;align-items:center;gap:7px}
+.mrow span{font-size:13px;color:var(--t2)}
+.mrow input{padding:9px 12px;border-radius:8px;border:1px solid var(--border);font-size:16px;font-weight:600;color:var(--text);background:var(--s2);outline:none;transition:border .15s}
+.mrow input:focus{border-color:var(--accent)}
+.wide{width:155px}.narrow{width:105px}
+.apply-btn{padding:10px 22px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+.apply-btn:hover{background:#a84d22}
+.clr-btn{padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--t2);font-size:12px;cursor:pointer}
+.sec-label{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi-label{font-size:10px;color:var(--t2);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.kpi-val{font-size:23px;font-weight:600;line-height:1;margin-bottom:3px}
+.kpi-sub{font-size:11px;color:var(--t3)}
+.kpi.green{border-color:var(--green)}.kpi.green .kpi-val{color:var(--green)}
+.kpi.amber .kpi-val{color:var(--amber)}
+.kpi.muted .kpi-val{color:var(--t3)}
+.skel{background:linear-gradient(90deg,var(--s2) 25%,var(--border) 50%,var(--s2) 75%);background-size:200% 100%;animation:sh 1.4s infinite;border-radius:12px;height:80px}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+@media(max-width:640px){.two-col{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px}
+.card-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card-title{font-size:13px;font-weight:600}
+.card-total{font-size:12px;color:var(--t2);font-weight:600}
+.camp-row{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--s2);gap:8px}
+.camp-row:last-child{border-bottom:none}
+.camp-name{font-size:12px;color:var(--t2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.camp-right{text-align:right;flex-shrink:0}
+.camp-spend{font-size:13px;font-weight:600}
+.camp-meta{font-size:11px;color:var(--t3);margin-top:2px}
+.pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-top:3px}
+.pill-g{background:var(--green-bg);color:var(--green)}
+.pill-a{background:var(--amber-bg);color:var(--amber)}
+.pill-r{background:var(--red-bg);color:var(--red)}
+.hint{background:var(--amber-bg);color:var(--amber);padding:10px 14px;border-radius:10px;font-size:12px;margin-bottom:16px}
+.err{background:var(--red-bg);color:var(--red);padding:10px 14px;border-radius:10px;font-size:12px;margin-bottom:16px}
+.footer{text-align:center;font-size:11px;color:var(--t3);padding:24px 0 12px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px">
+    <span class="logo">Kambai</span>
+    <div class="badge"><span class="dot" id="dot"></span><span id="status">Buscando...</span></div>
+  </div>
+  <button class="refresh-btn" id="refreshBtn" onclick="loadAll()">↻ Atualizar</button>
+</div>
+
+<div class="wrap">
+  <div class="date-txt" id="dateTxt"></div>
+
+  <div class="manual-card">
+    <h2>📋 Dados do Magazord — preencha aqui</h2>
+    <div class="mfields">
+      <div class="mf">
+        <label>Faturamento</label>
+        <div class="mrow"><span>R$</span><input id="iRev" class="wide" type="text" placeholder="0,00"></div>
+      </div>
+      <div class="mf">
+        <label>Nº de vendas</label>
+        <div class="mrow"><input id="iOrders" class="narrow" type="text" placeholder="0"><span>pedidos</span></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <button class="apply-btn" onclick="calc()">Calcular</button>
+        <button class="clr-btn" onclick="clearM()">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-label">Resultado do dia</div>
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+    <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+  </div>
+
+  <div id="msgBox"></div>
+
+  <div class="sec-label">Campanhas ativas hoje</div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-hd"><div class="card-title">Meta Ads</div><div class="card-total" id="fbTotal"></div></div>
+      <div id="fbCamps"><div style="font-size:12px;color:var(--t3)">Carregando...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><div class="card-title">Google Ads</div><div class="card-total" id="gTotal"></div></div>
+      <div id="gCamps"><div style="font-size:12px;color:var(--t3)">Carregando...</div></div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer"></div>
+</div>
+
+<script>
+const R = n => n==null?'—':'R$ '+Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const N = n => n==null?'—':Math.round(n).toLocaleString('pt-BR');
+const P = n => n==null?'—':(n*100).toFixed(2)+'%';
+const X = n => (!n||n<=0)?'—':n.toFixed(2)+'x';
+
+let ads = {fb:[], gads:[]};
+let manRev=null, manOrders=null;
+const todayStr = new Date().toISOString().slice(0,10);
+
+document.getElementById('dateTxt').textContent =
+  new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+function setStatus(loading, msg) {
+  document.getElementById('dot').className = 'dot'+(loading?' spin':'');
+  document.getElementById('status').textContent = msg;
+}
+
+async function loadAll() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  setStatus(true, 'Buscando dados...');
+  document.getElementById('kpiGrid').innerHTML = '<div class="skel"></div>'.repeat(6);
+  document.getElementById('fbCamps').innerHTML = '<div style="font-size:12px;color:var(--t3)">Carregando...</div>';
+  document.getElementById('gCamps').innerHTML  = '<div style="font-size:12px;color:var(--t3)">Carregando...</div>';
+
+  try {
+    const res  = await fetch(`/api/ads?date=${todayStr}`);
+    const data = await res.json();
+
+    if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
+
+    ads.fb   = data.fb   || [];
+    ads.gads = data.gads || [];
+
+    const t = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    setStatus(false, 'Atualizado às '+t);
+    document.getElementById('footer').textContent = 'Dados de '+data.date+' via Windsor.ai · Atualizado: '+t;
+    document.getElementById('msgBox').innerHTML = '';
+
+  } catch(e) {
+    setStatus(false, 'Erro');
+    document.getElementById('msgBox').innerHTML = '<div class="err">❌ '+e.message+'</div>';
+    document.getElementById('footer').textContent = '';
+  }
+
+  renderAll();
+  btn.disabled = false;
+}
+
+function calc() {
+  const rawR = document.getElementById('iRev').value.replace(/\./g,'').replace(',','.');
+  const rawO = document.getElementById('iOrders').value.replace(/\./g,'').replace(',','.');
+  manRev    = parseFloat(rawR)>0 ? parseFloat(rawR) : null;
+  manOrders = parseFloat(rawO)>0 ? parseFloat(rawO) : null;
+  renderAll();
+}
+function clearM() {
+  manRev=null; manOrders=null;
+  document.getElementById('iRev').value='';
+  document.getElementById('iOrders').value='';
+  renderAll();
+}
+
+function renderAll() {
+  const fb   = ads.fb   || [];
+  const gads = ads.gads || [];
+
+  const fbSpend  = fb.reduce((s,r)=>s+(r.spend||0),0);
+  const fbClicks = fb.reduce((s,r)=>s+(r.clicks||0),0);
+  const fbReach  = fb.reduce((s,r)=>s+(r.reach||0),0);
+  const gSpend   = gads.reduce((s,r)=>s+(r.spend||0),0);
+  const gClicks  = gads.reduce((s,r)=>s+(r.clicks||0),0);
+  const gConv    = gads.reduce((s,r)=>s+(r.conversions||0),0);
+  const total    = fbSpend+gSpend;
+
+  const ticket = (manRev&&manOrders) ? manRev/manOrders : null;
+  const roas   = (manRev&&total>0)   ? manRev/total     : null;
+  const cac    = (manOrders&&total>0)? total/manOrders  : null;
+
+  const roasCls = !roas?'muted':roas>=3?'green':roas>=1.5?'':'amber';
+
+  const kpis = [
+    {l:'Faturamento',  v:manRev?R(manRev):'—',   s:'Magazord',             cls:manRev?'green':'muted'},
+    {l:'Vendas',       v:manOrders?N(manOrders):'—', s:'pedidos',           cls:manOrders?'':'muted'},
+    {l:'Ticket médio', v:ticket?R(ticket):'—',    s:'faturamento ÷ vendas', cls:ticket?'':'muted'},
+    {l:'ROAS geral',   v:roas?X(roas):'—',        s:'faturamento ÷ gasto',  cls:roasCls},
+    {l:'Gasto total',  v:total>0?R(total):'...',  s:'Meta + Google Ads',    cls:''},
+    {l:'CAC',          v:cac?R(cac):'—',          s:'custo por venda',      cls:''},
+    {l:'Meta Ads',     v:fbSpend>0?R(fbSpend):'...', s:N(fbClicks)+' cliques · '+N(fbReach)+' alcance', cls:''},
+    {l:'Google Ads',   v:gSpend>0?R(gSpend):'...', s:N(gClicks)+' cliques · '+Math.round(gConv)+' conv.', cls:''},
+  ];
+
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k=>
+    `<div class="kpi ${k.cls}">
+      <div class="kpi-label">${k.l}</div>
+      <div class="kpi-val">${k.v}</div>
+      <div class="kpi-sub">${k.s}</div>
+    </div>`).join('');
+
+  if (!manRev&&!manOrders) {
+    document.getElementById('msgBox').innerHTML =
+      '<div class="hint">Preencha o faturamento e número de vendas do Magazord para calcular ROAS, ticket médio e CAC.</div>';
+  }
+
+  document.getElementById('fbTotal').textContent = fbSpend>0 ? R(fbSpend) : '';
+  document.getElementById('gTotal').textContent  = gSpend>0  ? R(gSpend)  : '';
+
+  document.getElementById('fbCamps').innerHTML = fb.length
+    ? [...fb].sort((a,b)=>b.spend-a.spend).map(c => {
+        const ctr = c.ctr||0;
+        const pill = ctr>=0.025?`<span class="pill pill-g">CTR ${P(ctr)}</span>`
+                   : ctr>=0.01 ?`<span class="pill pill-a">CTR ${P(ctr)}</span>`
+                   :             `<span class="pill pill-r">CTR ${P(ctr)}</span>`;
+        return `<div class="camp-row">
+          <div class="camp-name">${c.campaign}</div>
+          <div class="camp-right">
+            <div class="camp-spend">${R(c.spend)}</div>
+            <div class="camp-meta">${N(c.clicks)} cliques · CPC ${R(c.cpc)}</div>
+            ${pill}
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:12px;color:var(--t3);padding:8px 0">Sem campanhas ativas</div>';
+
+  document.getElementById('gCamps').innerHTML = gads.length
+    ? [...gads].sort((a,b)=>b.spend-a.spend).map(c => {
+        const conv = Math.round(c.conversions||0);
+        return `<div class="camp-row">
+          <div class="camp-name">${c.campaign}</div>
+          <div class="camp-right">
+            <div class="camp-spend">${R(c.spend)}</div>
+            <div class="camp-meta">${N(c.clicks)} cliques · CPC ${R(c.cpc)}</div>
+            ${conv>0?`<span class="pill pill-g">${conv} conv.</span>`:''}
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:12px;color:var(--t3);padding:8px 0">Sem campanhas ativas</div>';
+}
+
+loadAll();
+</script>
+</body>
+</html>
