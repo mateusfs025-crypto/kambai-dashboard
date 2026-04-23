@@ -8,7 +8,7 @@ async function fetchW(connector, fields, account, dateOpts) {
   const params = new URLSearchParams({ api_key: KEY, fields: fields.join(',') });
   params.append('accounts[]', account);
   if (dateOpts.date_preset) params.set('date_preset', dateOpts.date_preset);
-  if (dateOpts.date_from)   { params.set('date_from', dateOpts.date_from); params.set('date_to', dateOpts.date_to); }
+  if (dateOpts.date_from) { params.set('date_from', dateOpts.date_from); params.set('date_to', dateOpts.date_to); }
   const res  = await fetch(`${BASE}/${connector}?${params}`);
   const text = await res.text();
   if (!res.ok) throw new Error(`${connector} ${res.status}`);
@@ -44,12 +44,10 @@ function aggregateGA4(rows) {
   };
 }
 
-function aggregateFB(rows, filterDate) {
-  const norm = r => (r.date||'').slice(0,10);
-  const filtered = filterDate ? rows.filter(r => norm(r) === filterDate) : rows;
+function aggregateFB(rows) {
   const camps={};
   let spend=0,clicks=0,impr=0;
-  filtered.forEach(r=>{
+  (rows||[]).filter(r=>(r.spend||0)>0).forEach(r=>{
     const n=r.campaign||'(sem nome)';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,impressions:0};
     camps[n].spend+=r.spend||0;camps[n].clicks+=r.clicks||0;camps[n].impressions+=r.impressions||0;
@@ -61,12 +59,10 @@ function aggregateFB(rows, filterDate) {
   return {totalSpend:spend,totalClicks:clicks,totalImpressions:impr,campaigns};
 }
 
-function aggregateGAds(rows, filterDate) {
-  const norm = r => (r.date||'').slice(0,10);
-  const filtered = filterDate ? rows.filter(r => norm(r) === filterDate) : rows;
+function aggregateGAds(rows) {
   const camps={};
   let spend=0,clicks=0,conv=0;
-  filtered.forEach(r=>{
+  (rows||[]).filter(r=>(r.spend||0)>0).forEach(r=>{
     const n=r.campaign||'(sem nome)';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,conversions:0,cpcSum:0,cpcN:0};
     camps[n].spend+=r.spend||0;camps[n].clicks+=r.clicks||0;camps[n].conversions+=r.conversions||0;
@@ -84,18 +80,12 @@ module.exports = async function handler(req, res) {
 
   try {
     if (date) {
-      // HOJE — inclui campo date para filtrar com precisão no servidor
       const [fbR, gR] = await Promise.allSettled([
-        fetchW('facebook',   ['date','campaign','spend','impressions','clicks','ctr','cpc','reach','frequency'], FB_ACC,  {date_from:date, date_to:date}),
-        fetchW('google_ads', ['date','campaign','spend','impressions','clicks','ctr','cpc','conversions'], GADS_ACC, {date_from:date, date_to:date})
+        fetchW('facebook',   ['campaign','spend','impressions','clicks','ctr','cpc','reach','frequency'], FB_ACC,  {date_from:date, date_to:date}),
+        fetchW('google_ads', ['campaign','spend','impressions','clicks','ctr','cpc','conversions'], GADS_ACC, {date_from:date, date_to:date})
       ]);
-      const fbAll  = fbR.status==='fulfilled'  ? fbR.value  : [];
-      const gAll   = gR.status==='fulfilled'   ? gR.value   : [];
-
-      // Filtra pelo dia exato para garantir que não vem dias extras
-      const fb   = aggregateFB(fbAll, date);
-      const gads = aggregateGAds(gAll, date);
-
+      const fb   = aggregateFB(fbR.status==='fulfilled'  ? fbR.value  : []);
+      const gads = aggregateGAds(gR.status==='fulfilled' ? gR.value   : []);
       res.status(200).json({ok:true, date, fb, gads});
 
     } else if (period) {
