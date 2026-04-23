@@ -5,9 +5,8 @@ const FB_ACC   = '2858329897589220';
 const BASE     = 'https://connectors.windsor.ai';
 const META_BASE = 'https://graph.facebook.com/v19.0';
 
-// ── META API DIRETA (tempo real) ─────────────────────
 async function fetchMeta(date) {
-  const token = process.env.META_TOKEN;
+  const token = process.env.METATOKEN;
   const fields = 'campaign_name,spend,clicks,impressions,ctr,cpc,cpm,reach,frequency,purchase_roas';
   const url = `${META_BASE}/act_${FB_ACC}/insights?fields=${fields}&time_range={"since":"${date}","until":"${date}"}&level=campaign&limit=100&access_token=${token}`;
   const r = await fetch(url);
@@ -17,7 +16,7 @@ async function fetchMeta(date) {
 }
 
 async function fetchMetaPeriod(dateFrom, dateTo) {
-  const token = process.env.META_TOKEN;
+  const token = process.env.METATOKEN;
   const fields = 'campaign_name,spend,clicks,impressions,ctr,cpc,cpm,reach,frequency,purchase_roas';
   const url = `${META_BASE}/act_${FB_ACC}/insights?fields=${fields}&time_range={"since":"${dateFrom}","until":"${dateTo}"}&level=campaign&limit=100&access_token=${token}`;
   const r = await fetch(url);
@@ -26,7 +25,6 @@ async function fetchMetaPeriod(dateFrom, dateTo) {
   return (d.data || []);
 }
 
-// ── WINDSOR (Google Ads + GA4) ───────────────────────
 async function get(connector, fields, account, extra) {
   const p = new URLSearchParams({ api_key: KEY, fields: fields.join(',') });
   p.append('accounts[]', account);
@@ -38,7 +36,6 @@ async function get(connector, fields, account, extra) {
   return Array.isArray(d) ? d : (d.data || []);
 }
 
-// ── AGREGADORES ──────────────────────────────────────
 function extractMetaRoas(v) {
   if (!v || !Array.isArray(v)) return null;
   const item = v.find(r => r.action_type === 'omni_purchase');
@@ -115,7 +112,6 @@ function sumGA4(rows) {
     dailyTrend:Object.values(byDay).sort((a,b)=>a.date.localeCompare(b.date))};
 }
 
-// ── HANDLER ──────────────────────────────────────────
 module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Content-Type','application/json');
@@ -123,7 +119,6 @@ module.exports = async function(req, res) {
 
   try {
     if (date) {
-      // Meta: API direta em tempo real | Google: Windsor
       const [metaR, gR] = await Promise.allSettled([
         fetchMeta(date),
         get('google_ads',['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],GADS_ACC,{date_preset:'last_3dT'})
@@ -133,7 +128,6 @@ module.exports = async function(req, res) {
       const todayG   = gAll.filter(r=>(r.date||'').slice(0,10)===date&&(parseFloat(r.spend)||0)>0);
 
       return res.end(JSON.stringify({ok:true, date,
-        source: metaR.status==='fulfilled' ? 'meta_api' : 'error',
         fb:   sumFB(metaRows),
         gads: sumG(todayG.length ? todayG : gAll)
       }));
@@ -144,7 +138,6 @@ module.exports = async function(req, res) {
       const dateFrom = new Date(); dateFrom.setDate(dateFrom.getDate()-days);
       const fmt = d => d.toISOString().slice(0,10);
 
-      // Meta: API direta | Google + GA4: Windsor
       const [metaR, gR, ga4R] = await Promise.allSettled([
         fetchMetaPeriod(fmt(dateFrom), fmt(dateTo)),
         get('google_ads',      ['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],GADS_ACC,{date_preset:period}),
@@ -152,7 +145,6 @@ module.exports = async function(req, res) {
       ]);
 
       return res.end(JSON.stringify({ok:true, period,
-        source: metaR.status==='fulfilled' ? 'meta_api' : 'error',
         fb:   metaR.status==='fulfilled'  ? sumFB(metaR.value)  : null,
         gads: gR.status==='fulfilled'     ? sumG(gR.value)      : null,
         ga4:  ga4R.status==='fulfilled'   ? sumGA4(ga4R.value)  : null
