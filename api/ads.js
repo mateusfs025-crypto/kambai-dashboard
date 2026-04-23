@@ -1,31 +1,62 @@
-const KEY      = 'af49eacb41a92fa489a714e8dd18c47d8114';
-const FB_ACC   = '2858329897589220';
-const GADS_ACC = '159-714-9501';
-const GA4_ACC  = '379550350';
-const BASE     = 'https://connectors.windsor.ai';
+const WINDSOR_KEY  = 'af49eacb41a92fa489a714e8dd18c47d8114';
+const FB_ACC       = '2858329897589220';
+const GADS_ACC     = '159-714-9501';
+const GA4_ACC      = '379550350';
+const WINDSOR_BASE = 'https://connectors.windsor.ai';
+const META_BASE    = 'https://graph.facebook.com/v19.0';
 
-async function get(connector, fields, account, extra) {
-  const p = new URLSearchParams({ api_key: KEY, fields: fields.join(',') });
+// ── META GRAPH API (tempo real) ───────────────────────
+async function metaInsights(date) {
+  const token = process.env.META_ACCESS_TOKEN;
+  const fields = 'campaign_name,spend,clicks,impressions,ctr,cpc,reach,frequency';
+  const timeRange = JSON.stringify({ since: date, until: date });
+  const url = `${META_BASE}/act_${FB_ACC}/insights?access_token=${token}&fields=${fields}&level=campaign&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=100`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.error) throw new Error('Meta API: ' + d.error.message);
+  return (d.data || []).map(c => ({
+    campaign: c.campaign_name,
+    spend:       parseFloat(c.spend||0),
+    clicks:      parseInt(c.clicks||0),
+    impressions: parseInt(c.impressions||0),
+    ctr:         parseFloat(c.ctr||0)/100,
+    cpc:         parseFloat(c.cpc||0),
+    reach:       parseInt(c.reach||0),
+  }));
+}
+
+async function metaInsightsPeriod(dateFrom, dateTo) {
+  const token = process.env.META_ACCESS_TOKEN;
+  const fields = 'campaign_name,spend,clicks,impressions,ctr,cpc';
+  const timeRange = JSON.stringify({ since: dateFrom, until: dateTo });
+  const url = `${META_BASE}/act_${FB_ACC}/insights?access_token=${token}&fields=${fields}&level=campaign&time_range=${encodeURIComponent(timeRange)}&time_increment=1&limit=500`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.error) throw new Error('Meta API: ' + d.error.message);
+  return (d.data || []).map(c => ({
+    campaign: c.campaign_name,
+    spend:       parseFloat(c.spend||0),
+    clicks:      parseInt(c.clicks||0),
+    impressions: parseInt(c.impressions||0),
+    ctr:         parseFloat(c.ctr||0)/100,
+    cpc:         parseFloat(c.cpc||0),
+  }));
+}
+
+// ── WINDSOR (Google Ads + GA4) ────────────────────────
+async function getWindsor(connector, fields, account, extra) {
+  const p = new URLSearchParams({ api_key: WINDSOR_KEY, fields: fields.join(',') });
   p.append('accounts[]', account);
   Object.entries(extra).forEach(([k,v]) => p.set(k,v));
-  const ctrl = new AbortController();
-  setTimeout(() => ctrl.abort(), 8000);
-  const r = await fetch(`${BASE}/${connector}?${p}`, { signal: ctrl.signal });
+  const r = await fetch(`${WINDSOR_BASE}/${connector}?${p}`);
   const d = await r.json();
   return Array.isArray(d) ? d : (d.data || []);
 }
 
-function sumFB(rows, filterDate) {
+// ── AGREGADORES ───────────────────────────────────────
+function sumFB(rows) {
   const camps={};let spend=0,clicks=0,reach=0;
-  let filtered = rows||[];
-  if (filterDate) {
-    // tenta filtrar por data; se nada bater, usa tudo (Windsor sem campo date)
-    const byDate = filtered.filter(r => (r.date||'').slice(0,10) === filterDate && (r.spend||0)>0);
-    filtered = byDate.length > 0 ? byDate : filtered.filter(r=>(r.spend||0)>0);
-  } else {
-    filtered = filtered.filter(r=>(r.spend||0)>0);
-  }
-  filtered.forEach(r=>{
+  (rows||[]).filter(r=>(r.spend||0)>0).forEach(r=>{
     const n=r.campaign||'?';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,ctr:0,cpc:0};
     camps[n].spend+=r.spend||0;camps[n].clicks+=r.clicks||0;
@@ -36,16 +67,9 @@ function sumFB(rows, filterDate) {
     campaigns:Object.values(camps).sort((a,b)=>b.spend-a.spend)};
 }
 
-function sumG(rows, filterDate) {
+function sumG(rows) {
   const camps={};let spend=0,clicks=0,conv=0;
-  let filtered = rows||[];
-  if (filterDate) {
-    const byDate = filtered.filter(r => (r.date||'').slice(0,10) === filterDate && (r.spend||0)>0);
-    filtered = byDate.length > 0 ? byDate : filtered.filter(r=>(r.spend||0)>0);
-  } else {
-    filtered = filtered.filter(r=>(r.spend||0)>0);
-  }
-  filtered.forEach(r=>{
+  (rows||[]).filter(r=>(r.spend||0)>0).forEach(r=>{
     const n=r.campaign||'?';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,conversions:0,cpc:0};
     camps[n].spend+=r.spend||0;camps[n].clicks+=r.clicks||0;
@@ -78,6 +102,13 @@ function sumGA4(rows) {
     dailyTrend:Object.values(byDay).sort((a,b)=>a.date.localeCompare(b.date))};
 }
 
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0,10);
+}
+
+// ── HANDLER ───────────────────────────────────────────
 module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Content-Type','application/json');
@@ -85,21 +116,25 @@ module.exports = async function(req, res) {
 
   try {
     if (date) {
-      // Busca últimos 3 dias com campo date para filtrar hoje corretamente
-      const [fbR,gR] = await Promise.allSettled([
-        get('facebook',  ['date','campaign','spend','clicks','impressions','ctr','cpc','reach','frequency'], FB_ACC,  {date_preset:'last_3dT'}),
-        get('google_ads',['date','campaign','spend','clicks','ctr','cpc','conversions'],                     GADS_ACC, {date_preset:'last_3dT'})
+      // HOJE — Meta em tempo real + Google via Windsor
+      const [fbR, gR] = await Promise.allSettled([
+        metaInsights(date),
+        getWindsor('google_ads',['campaign','spend','clicks','ctr','cpc','conversions'],GADS_ACC,{date_from:date,date_to:date})
       ]);
       return res.end(JSON.stringify({ok:true, date,
-        fb:   sumFB(fbR.status==='fulfilled'?fbR.value:[], date),
-        gads: sumG(gR.status==='fulfilled'?gR.value:[], date)
+        fb:   sumFB(fbR.status==='fulfilled'?fbR.value:[]),
+        gads: sumG(gR.status==='fulfilled'?gR.value:[])
       }));
 
     } else if (period) {
-      const [fbR,gR,ga4R] = await Promise.allSettled([
-        get('facebook',        ['date','campaign','spend','clicks','impressions','ctr','cpc'],          FB_ACC,  {date_preset:period}),
-        get('google_ads',      ['date','campaign','spend','clicks','conversions','cpc'],                GADS_ACC,{date_preset:period}),
-        get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],GA4_ACC,{date_preset:period})
+      const days = period==='last_7d'?7:30;
+      const dateFrom = daysAgo(days);
+      const dateTo   = new Date().toISOString().slice(0,10);
+
+      const [fbR, gR, ga4R] = await Promise.allSettled([
+        metaInsightsPeriod(dateFrom, dateTo),
+        getWindsor('google_ads',['date','campaign','spend','clicks','conversions','cpc'],GADS_ACC,{date_preset:period}),
+        getWindsor('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],GA4_ACC,{date_preset:period})
       ]);
       return res.end(JSON.stringify({ok:true, period,
         fb:   fbR.status==='fulfilled'?sumFB(fbR.value):null,
