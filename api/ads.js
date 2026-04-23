@@ -1,9 +1,32 @@
 const KEY      = 'af49eacb41a92fa489a714e8dd18c47d8114';
-const FB_ACC   = '2858329897589220';
 const GADS_ACC = '159-714-9501';
 const GA4_ACC  = '379550350';
+const FB_ACC   = '2858329897589220';
 const BASE     = 'https://connectors.windsor.ai';
+const META_BASE = 'https://graph.facebook.com/v19.0';
 
+// ── META API DIRETA (tempo real) ─────────────────────
+async function fetchMeta(date) {
+  const token = process.env.META_TOKEN;
+  const fields = 'campaign_name,spend,clicks,impressions,ctr,cpc,cpm,reach,frequency,purchase_roas';
+  const url = `${META_BASE}/act_${FB_ACC}/insights?fields=${fields}&time_range={"since":"${date}","until":"${date}"}&level=campaign&limit=100&access_token=${token}`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.error) throw new Error('Meta API: ' + d.error.message);
+  return (d.data || []);
+}
+
+async function fetchMetaPeriod(dateFrom, dateTo) {
+  const token = process.env.META_TOKEN;
+  const fields = 'campaign_name,spend,clicks,impressions,ctr,cpc,cpm,reach,frequency,purchase_roas';
+  const url = `${META_BASE}/act_${FB_ACC}/insights?fields=${fields}&time_range={"since":"${dateFrom}","until":"${dateTo}"}&level=campaign&limit=100&access_token=${token}`;
+  const r = await fetch(url);
+  const d = await r.json();
+  if (d.error) throw new Error('Meta API: ' + d.error.message);
+  return (d.data || []);
+}
+
+// ── WINDSOR (Google Ads + GA4) ───────────────────────
 async function get(connector, fields, account, extra) {
   const p = new URLSearchParams({ api_key: KEY, fields: fields.join(',') });
   p.append('accounts[]', account);
@@ -15,6 +38,7 @@ async function get(connector, fields, account, extra) {
   return Array.isArray(d) ? d : (d.data || []);
 }
 
+// ── AGREGADORES ──────────────────────────────────────
 function extractMetaRoas(v) {
   if (!v || !Array.isArray(v)) return null;
   const item = v.find(r => r.action_type === 'omni_purchase');
@@ -24,22 +48,25 @@ function extractMetaRoas(v) {
 function sumFB(rows) {
   const camps={};let spend=0,clicks=0,reach=0,impr=0;
   (rows||[]).filter(r=>(parseFloat(r.spend)||0)>0).forEach(r=>{
-    const n=r.campaign||'?';
+    const n=r.campaign_name||r.campaign||'?';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,ctr:0,cpc:0,cpm:0,reach:0,frequency:0,roas:null};
     camps[n].spend    += parseFloat(r.spend)||0;
     camps[n].clicks   += parseFloat(r.clicks)||0;
-    camps[n].ctr       = r.ctr||0;
-    camps[n].cpc       = r.cpc||0;
-    camps[n].cpm       = r.cpm||0;
+    camps[n].ctr       = parseFloat(r.ctr)||0;
+    camps[n].cpc       = parseFloat(r.cpc)||0;
+    camps[n].cpm       = parseFloat(r.cpm)||0;
     camps[n].reach    += parseFloat(r.reach)||0;
-    camps[n].frequency = r.frequency||0;
+    camps[n].frequency = parseFloat(r.frequency)||0;
     camps[n].roas      = extractMetaRoas(r.purchase_roas);
     spend += parseFloat(r.spend)||0;
     clicks+= parseFloat(r.clicks)||0;
     reach += parseFloat(r.reach)||0;
     impr  += parseFloat(r.impressions)||0;
   });
-  return {totalSpend:spend,totalClicks:clicks,totalReach:reach,totalImpressions:impr,
+  const fbRoasAvg = Object.values(camps).filter(c=>c.roas).length
+    ? Object.values(camps).filter(c=>c.roas).reduce((s,c)=>s+c.roas,0)/Object.values(camps).filter(c=>c.roas).length
+    : null;
+  return {totalSpend:spend,totalClicks:clicks,totalReach:reach,totalImpressions:impr,avgRoas:fbRoasAvg,
     campaigns:Object.values(camps).sort((a,b)=>b.spend-a.spend)};
 }
 
@@ -52,9 +79,7 @@ function sumG(rows) {
     camps[n].clicks         += parseFloat(r.clicks)||0;
     camps[n].conversions    += parseFloat(r.conversions)||0;
     camps[n].conversionValue+= parseFloat(r.conversion_value)||0;
-    camps[n].cpc             = r.cpc||0;
-    const roasRaw = parseFloat(r.roas)||0;
-    camps[n].roas = roasRaw>0 ? roasRaw/100 : null;
+    camps[n].cpc             = parseFloat(r.cpc)||0;
     spend   += parseFloat(r.spend)||0;
     clicks  += parseFloat(r.clicks)||0;
     conv    += parseFloat(r.conversions)||0;
@@ -78,8 +103,11 @@ function sumGA4(rows) {
     else if(med==='organic')c='Orgânico';
     else if(src==='edrone'||med==='email')c='Email';
     if(!ch[c])ch[c]={name:c,revenue:0,transactions:0,sessions:0};
-    ch[c].revenue+=parseFloat(r.totalrevenue)||0;ch[c].transactions+=parseFloat(r.transactions)||0;ch[c].sessions+=parseFloat(r.sessions)||0;
-    rev+=parseFloat(r.totalrevenue)||0;tx+=parseFloat(r.transactions)||0;sess+=parseFloat(r.sessions)||0;newu+=parseFloat(r.newusers)||0;
+    ch[c].revenue+=parseFloat(r.totalrevenue)||0;
+    ch[c].transactions+=parseFloat(r.transactions)||0;
+    ch[c].sessions+=parseFloat(r.sessions)||0;
+    rev+=parseFloat(r.totalrevenue)||0;tx+=parseFloat(r.transactions)||0;
+    sess+=parseFloat(r.sessions)||0;newu+=parseFloat(r.newusers)||0;
     if(r.date){const d=r.date.slice(0,10);if(!byDay[d])byDay[d]={date:d,revenue:0,transactions:0};byDay[d].revenue+=parseFloat(r.totalrevenue)||0;byDay[d].transactions+=parseFloat(r.transactions)||0;}
   });
   return {totalRevenue:rev,totalTransactions:tx,totalSessions:sess,totalNewUsers:newu,
@@ -87,35 +115,49 @@ function sumGA4(rows) {
     dailyTrend:Object.values(byDay).sort((a,b)=>a.date.localeCompare(b.date))};
 }
 
+// ── HANDLER ──────────────────────────────────────────
 module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Content-Type','application/json');
   const { date, period } = req.query;
+
   try {
     if (date) {
-      const [fbR,gR] = await Promise.allSettled([
-        get('facebook',  ['date','campaign','spend','clicks','impressions','ctr','cpc','cpm','reach','frequency','purchase_roas'],FB_ACC,  {date_preset:'last_3dT'}),
-        get('google_ads',['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],               GADS_ACC, {date_preset:'last_3dT'})
+      // Meta: API direta em tempo real | Google: Windsor
+      const [metaR, gR] = await Promise.allSettled([
+        fetchMeta(date),
+        get('google_ads',['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],GADS_ACC,{date_preset:'last_3dT'})
       ]);
-      const fbAll = fbR.status==='fulfilled'?fbR.value:[];
-      const gAll  = gR.status==='fulfilled'?gR.value:[];
-      const todayFb = fbAll.filter(r=>(r.date||'').slice(0,10)===date&&(parseFloat(r.spend)||0)>0);
-      const todayG  = gAll.filter(r=>(r.date||'').slice(0,10)===date&&(parseFloat(r.spend)||0)>0);
-      return res.end(JSON.stringify({ok:true,date,
-        fb:   sumFB(todayFb.length?todayFb:fbAll),
-        gads: sumG(todayG.length?todayG:gAll)
+      const metaRows = metaR.status==='fulfilled' ? metaR.value : [];
+      const gAll     = gR.status==='fulfilled'    ? gR.value   : [];
+      const todayG   = gAll.filter(r=>(r.date||'').slice(0,10)===date&&(parseFloat(r.spend)||0)>0);
+
+      return res.end(JSON.stringify({ok:true, date,
+        source: metaR.status==='fulfilled' ? 'meta_api' : 'error',
+        fb:   sumFB(metaRows),
+        gads: sumG(todayG.length ? todayG : gAll)
       }));
+
     } else if (period) {
-      const [fbR,gR,ga4R] = await Promise.allSettled([
-        get('facebook',        ['date','campaign','spend','clicks','impressions','ctr','cpc','cpm','reach','frequency','purchase_roas'],FB_ACC,  {date_preset:period}),
-        get('google_ads',      ['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],               GADS_ACC,{date_preset:period}),
-        get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],                          GA4_ACC, {date_preset:period})
+      const days = period==='last_7d' ? 7 : 30;
+      const dateTo   = new Date(); dateTo.setDate(dateTo.getDate()-1);
+      const dateFrom = new Date(); dateFrom.setDate(dateFrom.getDate()-days);
+      const fmt = d => d.toISOString().slice(0,10);
+
+      // Meta: API direta | Google + GA4: Windsor
+      const [metaR, gR, ga4R] = await Promise.allSettled([
+        fetchMetaPeriod(fmt(dateFrom), fmt(dateTo)),
+        get('google_ads',      ['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],GADS_ACC,{date_preset:period}),
+        get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],          GA4_ACC, {date_preset:period})
       ]);
-      return res.end(JSON.stringify({ok:true,period,
-        fb:   fbR.status==='fulfilled'?sumFB(fbR.value):null,
-        gads: gR.status==='fulfilled'?sumG(gR.value):null,
-        ga4:  ga4R.status==='fulfilled'?sumGA4(ga4R.value):null
+
+      return res.end(JSON.stringify({ok:true, period,
+        source: metaR.status==='fulfilled' ? 'meta_api' : 'error',
+        fb:   metaR.status==='fulfilled'  ? sumFB(metaR.value)  : null,
+        gads: gR.status==='fulfilled'     ? sumG(gR.value)      : null,
+        ga4:  ga4R.status==='fulfilled'   ? sumGA4(ga4R.value)  : null
       }));
+
     } else {
       return res.status(400).end(JSON.stringify({ok:false,error:'Faltou date ou period'}));
     }
