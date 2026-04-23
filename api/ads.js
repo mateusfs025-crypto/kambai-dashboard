@@ -8,9 +8,15 @@ async function get(connector, fields, account, extra) {
   const p = new URLSearchParams({ api_key: KEY, fields: fields.join(',') });
   p.append('accounts[]', account);
   Object.entries(extra).forEach(([k,v]) => p.set(k,v));
-  const r = await fetch(`${BASE}/${connector}?${p}`);
-  const d = await r.json();
-  return Array.isArray(d) ? d : (d.data || []);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(`${BASE}/${connector}?${p}`, { signal: ctrl.signal });
+    const d = await r.json();
+    return Array.isArray(d) ? d : (d.data || []);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function sumFB(rows) {
@@ -50,8 +56,7 @@ function sumG(rows) {
 }
 
 function sumGA4(rows) {
-  const ch = {};
-  const byDay = {};
+  const ch = {}, byDay = {};
   let rev=0,tx=0,sess=0,newu=0;
   (rows||[]).forEach(r=>{
     const src=(r.source||'').toLowerCase(), med=(r.medium||'').toLowerCase();
@@ -63,55 +68,46 @@ function sumGA4(rows) {
     else if(med==='organic')c='Orgânico';
     else if(src==='edrone'||med==='email')c='Email';
     if(!ch[c])ch[c]={name:c,revenue:0,transactions:0,sessions:0};
-    ch[c].revenue     += r.totalrevenue||0;
-    ch[c].transactions+= r.transactions||0;
-    ch[c].sessions    += r.sessions||0;
-    rev +=r.totalrevenue||0; tx+=r.transactions||0;
-    sess+=r.sessions||0; newu+=r.newusers||0;
-    if(r.date){
-      const d=r.date.slice(0,10);
-      if(!byDay[d])byDay[d]={date:d,revenue:0,transactions:0};
-      byDay[d].revenue+=r.totalrevenue||0;
-      byDay[d].transactions+=r.transactions||0;
-    }
+    ch[c].revenue+=r.totalrevenue||0;ch[c].transactions+=r.transactions||0;ch[c].sessions+=r.sessions||0;
+    rev+=r.totalrevenue||0;tx+=r.transactions||0;sess+=r.sessions||0;newu+=r.newusers||0;
+    if(r.date){const d=r.date.slice(0,10);if(!byDay[d])byDay[d]={date:d,revenue:0,transactions:0};byDay[d].revenue+=r.totalrevenue||0;byDay[d].transactions+=r.transactions||0;}
   });
-  return {
-    totalRevenue:rev, totalTransactions:tx, totalSessions:sess, totalNewUsers:newu,
-    channels: Object.values(ch).sort((a,b)=>b.revenue-a.revenue),
-    dailyTrend: Object.values(byDay).sort((a,b)=>a.date.localeCompare(b.date))
-  };
+  return {totalRevenue:rev,totalTransactions:tx,totalSessions:sess,totalNewUsers:newu,
+    channels:Object.values(ch).sort((a,b)=>b.revenue-a.revenue),
+    dailyTrend:Object.values(byDay).sort((a,b)=>a.date.localeCompare(b.date))};
 }
 
 module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin','*');
+  res.setHeader('Content-Type','application/json');
   const { date, period } = req.query;
   try {
     if (date) {
       const extra = { date_from: date, date_to: date };
       const [fbR, gR] = await Promise.allSettled([
-        get('facebook',   ['campaign','spend','clicks','impressions','ctr','cpc','reach','frequency'], FB_ACC,   extra),
-        get('google_ads', ['campaign','spend','clicks','impressions','ctr','cpc','conversions'],        GADS_ACC, extra)
+        get('facebook',   ['campaign','spend','clicks','impressions','ctr','cpc','reach'], FB_ACC,   extra),
+        get('google_ads', ['campaign','spend','clicks','ctr','cpc','conversions'],          GADS_ACC, extra)
       ]);
-      res.json({ ok:true, date,
+      return res.end(JSON.stringify({ ok:true, date,
         fb:   sumFB(fbR.status==='fulfilled' ? fbR.value : []),
         gads: sumG(gR.status==='fulfilled'   ? gR.value  : [])
-      });
+      }));
     } else if (period) {
       const extra = { date_preset: period };
       const [fbR,gR,ga4R] = await Promise.allSettled([
-        get('facebook',        ['date','campaign','spend','clicks','impressions','ctr','cpc'],          FB_ACC,   extra),
+        get('facebook',        ['date','campaign','spend','clicks','ctr','cpc'],                       FB_ACC,   extra),
         get('google_ads',      ['date','campaign','spend','clicks','conversions','cpc'],                GADS_ACC, extra),
         get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'], GA4_ACC, extra)
       ]);
-      res.json({ ok:true, period,
+      return res.end(JSON.stringify({ ok:true, period,
         fb:   fbR.status==='fulfilled'  ? sumFB(fbR.value)  : null,
         gads: gR.status==='fulfilled'   ? sumG(gR.value)    : null,
         ga4:  ga4R.status==='fulfilled' ? sumGA4(ga4R.value): null
-      });
+      }));
     } else {
-      res.status(400).json({ok:false, error:'Faltou date ou period'});
+      return res.status(400).end(JSON.stringify({ok:false,error:'Faltou date ou period'}));
     }
   } catch(e) {
-    res.status(500).json({ok:false, error:e.message});
+    return res.status(500).end(JSON.stringify({ok:false,error:e.message}));
   }
 };
