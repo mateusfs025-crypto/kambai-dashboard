@@ -120,13 +120,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div id="tab-hoje" class="tab-content active">
 <div class="wrap">
   <div class="manual-card">
-    <h2>📋 Dados do Magazord — preencha aqui</h2>
+    <h2>📋 Dados do Magazord — hoje</h2>
     <div class="mfields">
       <div class="mf"><label>Faturamento</label><div class="mrow"><span>R$</span><input id="iRev" class="wide" type="text" placeholder="0,00"></div></div>
       <div class="mf"><label>Nº de vendas</label><div class="mrow"><input id="iOrders" class="narrow" type="text" placeholder="0"><span>pedidos</span></div></div>
       <div style="display:flex;gap:8px;align-items:flex-end">
-        <button class="apply-btn" onclick="calcToday()">Calcular</button>
-        <button class="clr-btn" onclick="clearToday()">Limpar</button>
+        <button class="apply-btn" onclick="calcPeriod('hoje')">Calcular</button>
+        <button class="clr-btn" onclick="clearPeriod('hoje')">Limpar</button>
       </div>
     </div>
   </div>
@@ -145,11 +145,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <!-- 7 DIAS -->
 <div id="tab-7d" class="tab-content">
 <div class="wrap">
+  <div class="manual-card">
+    <h2>📋 Dados do Magazord — últimos 7 dias</h2>
+    <div class="mfields">
+      <div class="mf"><label>Faturamento</label><div class="mrow"><span>R$</span><input id="iRev7d" class="wide" type="text" placeholder="0,00"></div></div>
+      <div class="mf"><label>Nº de vendas</label><div class="mrow"><input id="iOrders7d" class="narrow" type="text" placeholder="0"><span>pedidos</span></div></div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <button class="apply-btn" onclick="calcPeriod('7d')">Calcular</button>
+        <button class="clr-btn" onclick="clearPeriod('7d')">Limpar</button>
+      </div>
+    </div>
+  </div>
   <div class="sec-label">Resumo — últimos 7 dias</div>
   <div class="kpi-grid" id="kpis7d"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
   <div class="sec-label">Performance por canal</div>
   <div class="card" style="margin-bottom:20px;overflow-x:auto">
-    <table class="ch-table"><thead><tr><th>Canal</th><th>Receita</th><th>Pedidos</th><th>Sessões</th><th>Conv.%</th><th>Gasto</th><th>ROAS</th></tr></thead>
+    <table class="ch-table"><thead><tr><th>Canal</th><th>Receita GA4</th><th>Pedidos</th><th>Sessões</th><th>Conv.%</th><th>Gasto</th><th>ROAS</th></tr></thead>
     <tbody id="ch7d"><tr><td colspan="7" class="empty">Carregando...</td></tr></tbody></table>
   </div>
   <div class="sec-label">Campanhas</div>
@@ -164,15 +175,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <!-- 30 DIAS -->
 <div id="tab-30d" class="tab-content">
 <div class="wrap">
+  <div class="manual-card">
+    <h2>📋 Dados do Magazord — últimos 30 dias</h2>
+    <div class="mfields">
+      <div class="mf"><label>Faturamento</label><div class="mrow"><span>R$</span><input id="iRev30d" class="wide" type="text" placeholder="0,00"></div></div>
+      <div class="mf"><label>Nº de vendas</label><div class="mrow"><input id="iOrders30d" class="narrow" type="text" placeholder="0"><span>pedidos</span></div></div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <button class="apply-btn" onclick="calcPeriod('30d')">Calcular</button>
+        <button class="clr-btn" onclick="clearPeriod('30d')">Limpar</button>
+      </div>
+    </div>
+  </div>
   <div class="sec-label">Resumo — últimos 30 dias</div>
   <div class="kpi-grid" id="kpis30d"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
   <div class="charts-grid">
-    <div class="card"><div class="card-title">Receita diária</div><div style="position:relative;height:200px"><canvas id="trendChart"></canvas></div></div>
-    <div class="card"><div class="card-title">Receita por canal</div><div style="position:relative;height:200px"><canvas id="chanChart"></canvas></div></div>
+    <div class="card"><div class="card-title">Receita diária (GA4)</div><div style="position:relative;height:200px"><canvas id="trendChart"></canvas></div></div>
+    <div class="card"><div class="card-title">Receita por canal (GA4)</div><div style="position:relative;height:200px"><canvas id="chanChart"></canvas></div></div>
   </div>
   <div class="sec-label">Performance por canal</div>
   <div class="card" style="margin-bottom:20px;overflow-x:auto">
-    <table class="ch-table"><thead><tr><th>Canal</th><th>Receita</th><th>Pedidos</th><th>Sessões</th><th>Conv.%</th><th>Gasto</th><th>ROAS</th></tr></thead>
+    <table class="ch-table"><thead><tr><th>Canal</th><th>Receita GA4</th><th>Pedidos</th><th>Sessões</th><th>Conv.%</th><th>Gasto</th><th>ROAS</th></tr></thead>
     <tbody id="ch30d"><tr><td colspan="7" class="empty">Carregando...</td></tr></tbody></table>
   </div>
   <div class="sec-label">Campanhas</div>
@@ -186,7 +208,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <script>
-const SENHA='kambai2026', SK='kmb_auth';
+const SENHA='kambai2026',SK='kmb_auth';
 function checkPwd(){
   const v=document.getElementById('pwdInput').value;
   if(v===SENHA){sessionStorage.setItem(SK,'1');document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';loadToday();}
@@ -200,7 +222,10 @@ const P=n=>n==null?'—':(n*100).toFixed(2)+'%';
 const X=n=>(!n||n<=0)?'—':n.toFixed(2)+'x';
 const todayStr=new Date().toISOString().slice(0,10);
 
-let currentTab='hoje', data={today:null,'7d':null,'30d':null}, manRev=null, manOrders=null, charts={};
+let currentTab='hoje';
+let data={today:null,'7d':null,'30d':null};
+let manual={hoje:{rev:null,orders:null},'7d':{rev:null,orders:null},'30d':{rev:null,orders:null}};
+let charts={};
 
 function switchTab(tab){
   currentTab=tab;
@@ -211,6 +236,23 @@ function switchTab(tab){
 }
 function refreshCurrent(){data[currentTab]=null;if(currentTab==='hoje')loadToday();else loadPeriod(currentTab);}
 function setStatus(loading,msg){document.getElementById('dot').className='dot'+(loading?' spin':'');document.getElementById('status').textContent=msg;}
+
+function calcPeriod(tab){
+  const sfx=tab==='hoje'?'':tab;
+  const rawR=document.getElementById('iRev'+sfx).value.replace(/\./g,'').replace(',','.');
+  const rawO=document.getElementById('iOrders'+sfx).value.replace(/\./g,'').replace(',','.');
+  manual[tab].rev=parseFloat(rawR)>0?parseFloat(rawR):null;
+  manual[tab].orders=parseFloat(rawO)>0?parseFloat(rawO):null;
+  if(tab==='hoje')renderToday();else if(tab==='7d')render7d();else render30d();
+}
+function clearPeriod(tab){
+  const sfx=tab==='hoje'?'':tab;
+  manual[tab].rev=null;manual[tab].orders=null;
+  document.getElementById('iRev'+sfx).value='';
+  document.getElementById('iOrders'+sfx).value='';
+  if(tab==='hoje')renderToday();else if(tab==='7d')render7d();else render30d();
+}
+function kpiHtml(items){return items.map(k=>`<div class="kpi ${k.c||''}"><div class="kpi-label">${k.l}</div><div class="kpi-val">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');}
 
 async function loadToday(){
   setStatus(true,'Buscando dados de hoje...');
@@ -231,37 +273,24 @@ async function loadToday(){
   document.getElementById('refreshBtn').disabled=false;
 }
 
-function calcToday(){
-  const rawR=document.getElementById('iRev').value.replace(/\./g,'').replace(',','.');
-  const rawO=document.getElementById('iOrders').value.replace(/\./g,'').replace(',','.');
-  manRev=parseFloat(rawR)>0?parseFloat(rawR):null;
-  manOrders=parseFloat(rawO)>0?parseFloat(rawO):null;
-  renderToday();
-}
-function clearToday(){manRev=null;manOrders=null;document.getElementById('iRev').value='';document.getElementById('iOrders').value='';renderToday();}
-
 function renderToday(){
   const d=data.today||{};
-  const fb=d.fb||{totalSpend:0,totalClicks:0,totalReach:0,campaigns:[]};
-  const ga=d.gads||{totalSpend:0,totalClicks:0,totalConversions:0,campaigns:[]};
-  const fbS=fb.totalSpend||0, fbC=fb.totalClicks||0, fbR=fb.totalReach||0;
-  const gS=ga.totalSpend||0, gC=ga.totalClicks||0, gV=ga.totalConversions||0;
-  const tot=fbS+gS;
-  const ticket=(manRev&&manOrders)?manRev/manOrders:null;
-  const roas=(manRev&&tot>0)?manRev/tot:null;
-  const cac=(manOrders&&tot>0)?tot/manOrders:null;
+  const fb=d.fb||{},ga=d.gads||{};
+  const fbS=fb.totalSpend||0,fbC=fb.totalClicks||0,fbR2=fb.totalReach||0;
+  const gS=ga.totalSpend||0,gC=ga.totalClicks||0,gV=ga.totalConversions||0;
+  const tot=fbS+gS,m=manual.hoje;
+  const ticket=(m.rev&&m.orders)?m.rev/m.orders:null;
+  const roas=(m.rev&&tot>0)?m.rev/tot:null;
   const rc=!roas?'muted':roas>=3?'green':roas>=1.5?'':'amber';
-
-  document.getElementById('todayKpis').innerHTML=[
-    {l:'Faturamento',v:manRev?R(manRev):'—',s:'Magazord',c:manRev?'green':'muted'},
-    {l:'Vendas',v:manOrders?N(manOrders):'—',s:'pedidos',c:manOrders?'':'muted'},
+  document.getElementById('todayKpis').innerHTML=kpiHtml([
+    {l:'Faturamento',v:m.rev?R(m.rev):'—',s:'Magazord',c:m.rev?'green':'muted'},
+    {l:'Vendas',v:m.orders?N(m.orders):'—',s:'pedidos',c:m.orders?'':'muted'},
     {l:'Ticket médio',v:ticket?R(ticket):'—',s:'receita ÷ vendas',c:ticket?'':'muted'},
     {l:'ROAS',v:roas?X(roas):'—',s:'faturamento ÷ gasto',c:rc},
-    {l:'Meta Ads',v:fbS>0?R(fbS):'...',s:N(fbC)+' cliques · '+N(fbR)+' alcance',c:''},
+    {l:'Meta Ads',v:fbS>0?R(fbS):'...',s:N(fbC)+' cliques · '+N(fbR2)+' alcance',c:''},
     {l:'Google Ads',v:gS>0?R(gS):'...',s:N(gC)+' cliques · '+Math.round(gV)+' conv.',c:''},
-  ].map(k=>`<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-val">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
-
-  document.getElementById('todayMsg').innerHTML=(!manRev&&!manOrders)?'<div class="hint">Preencha o faturamento e vendas do Magazord para calcular ROAS, ticket médio e CAC.</div>':'';
+  ]);
+  document.getElementById('todayMsg').innerHTML=(!m.rev&&!m.orders)?'<div class="hint">Preencha faturamento e vendas do Magazord para calcular ROAS, ticket médio e CAC.</div>':'';
   document.getElementById('todayFbTotal').textContent=fbS>0?R(fbS):'';
   document.getElementById('todayGTotal').textContent=gS>0?R(gS):'';
   document.getElementById('todayFbCamps').innerHTML=renderFbCamps(fb.campaigns||[]);
@@ -269,7 +298,7 @@ function renderToday(){
 }
 
 async function loadPeriod(tab){
-  const preset=tab==='7d'?'last_7d':'last_30d', label=tab==='7d'?'7 dias':'30 dias';
+  const preset=tab==='7d'?'last_7d':'last_30d',label=tab==='7d'?'7 dias':'30 dias';
   setStatus(true,'Buscando últimos '+label+'...');
   document.getElementById('refreshBtn').disabled=true;
   skels('kpis'+tab);
@@ -286,64 +315,50 @@ async function loadPeriod(tab){
   document.getElementById('refreshBtn').disabled=false;
 }
 
-function renderPeriodKpis(tab){
-  const d=data[tab]||{}, fb=d.fb, ga=d.gads, ga4=d.ga4;
-  const fbS=fb?.totalSpend||0, gS=ga?.totalSpend||0, tot=fbS+gS, rev=ga4?.totalRevenue||0;
-  const roas=tot>0?rev/tot:null, rc=!roas?'muted':roas>=3?'green':roas>=1.5?'':'amber';
-  return [
-    {l:'Receita GA4',v:R(rev),s:(ga4?.totalTransactions||0)+' pedidos',c:''},
+function renderPeriodData(tab){
+  const d=data[tab]||{},fb=d.fb,ga=d.gads,ga4=d.ga4;
+  const fbS=fb?.totalSpend||0,gS=ga?.totalSpend||0,tot=fbS+gS;
+  const m=manual[tab];
+  const rev=m.rev!=null?m.rev:(ga4?.totalRevenue||0);
+  const orders=m.orders!=null?m.orders:(ga4?.totalTransactions||0);
+  const ticket=(rev&&orders)?rev/orders:null;
+  const roas=(rev&&tot>0)?rev/tot:null;
+  const rc=!roas?'muted':roas>=3?'green':roas>=1.5?'':'amber';
+  const revLabel=m.rev!=null?'Magazord':'GA4';
+  document.getElementById('kpis'+tab).innerHTML=kpiHtml([
+    {l:'Faturamento',v:R(rev),s:revLabel+' · '+N(orders)+' pedidos',c:m.rev!=null?'green':''},
     {l:'ROAS geral',v:X(roas),s:'receita ÷ investimento',c:rc},
+    {l:'Ticket médio',v:ticket?R(ticket):'—',s:'faturamento ÷ pedidos',c:ticket?'':'muted'},
     {l:'Investimento',v:R(tot),s:'Meta + Google Ads',c:''},
     {l:'Meta Ads',v:R(fbS),s:N(fb?.totalClicks)+' cliques',c:''},
     {l:'Google Ads',v:R(gS),s:N(ga?.totalConversions)+' conv.',c:''},
-    {l:'Sessões',v:N(ga4?.totalSessions),s:N(ga4?.totalNewUsers)+' novos usuários',c:''},
-  ].map(k=>`<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-val">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
-}
-
-function renderChannelTable(tab){
-  const d=data[tab]||{}, fb=d.fb, ga=d.gads, ga4=d.ga4;
-  const fbS=fb?.totalSpend||0, gS=ga?.totalSpend||0;
-  return (ga4?.channels||[]).map(ch=>{
+  ]);
+  const channels=(ga4?.channels||[]).map(ch=>{
     let spend=0;
     if(ch.name==='Facebook Ads')spend=fbS;
     if(ch.name==='Google Ads')spend=gS;
-    const roas=spend>0?ch.revenue/spend:null, conv=ch.sessions>0?(ch.transactions/ch.sessions)*100:0;
-    const rc=roas==null?'rn':roas>=3?'rg':roas>=1.5?'ro':'rb';
-    return `<tr><td style="font-weight:600">${ch.name}</td><td>${R(ch.revenue)}</td><td>${N(ch.transactions)}</td><td>${N(ch.sessions)}</td><td>${conv?conv.toFixed(1)+'%':'—'}</td><td>${spend?R(spend):'—'}</td><td class="${rc}">${X(roas)}</td></tr>`;
+    let chRoas=null;
+    if(spend>0){const chRev=m.rev!=null?(m.rev*(ch.revenue/(ga4?.totalRevenue||1))):ch.revenue;chRoas=chRev/spend;}
+    const conv=ch.sessions>0?(ch.transactions/ch.sessions)*100:0;
+    const rc2=chRoas==null?'rn':chRoas>=3?'rg':chRoas>=1.5?'ro':'rb';
+    return `<tr><td style="font-weight:600">${ch.name}</td><td>${R(ch.revenue)}</td><td>${N(ch.transactions)}</td><td>${N(ch.sessions)}</td><td>${conv?conv.toFixed(1)+'%':'—'}</td><td>${spend?R(spend):'—'}</td><td class="${rc2}">${X(chRoas)}</td></tr>`;
   }).join('')||'<tr><td colspan="7" class="empty">Sem dados</td></tr>';
+  document.getElementById('ch'+tab).innerHTML=channels;
+  document.getElementById('fb'+tab+'Total').textContent=fb?R(fbS):'';
+  document.getElementById('g'+tab+'Total').textContent=ga?R(gS):'';
+  document.getElementById('fb'+tab+'Camps').innerHTML=renderFbCamps(fb?.campaigns||[]);
+  document.getElementById('g'+tab+'Camps').innerHTML=renderGCamps(ga?.campaigns||[]);
 }
 
-function render7d(){
-  document.getElementById('kpis7d').innerHTML=renderPeriodKpis('7d');
-  document.getElementById('ch7d').innerHTML=renderChannelTable('7d');
-  const d=data['7d']||{};
-  document.getElementById('fb7dTotal').textContent=d.fb?R(d.fb.totalSpend):'';
-  document.getElementById('g7dTotal').textContent=d.gads?R(d.gads.totalSpend):'';
-  document.getElementById('fb7dCamps').innerHTML=renderFbCamps(d.fb?.campaigns||[]);
-  document.getElementById('g7dCamps').innerHTML=renderGCamps(d.gads?.campaigns||[]);
-}
-
-function render30d(){
-  document.getElementById('kpis30d').innerHTML=renderPeriodKpis('30d');
-  document.getElementById('ch30d').innerHTML=renderChannelTable('30d');
-  const d=data['30d']||{};
-  document.getElementById('fb30dTotal').textContent=d.fb?R(d.fb.totalSpend):'';
-  document.getElementById('g30dTotal').textContent=d.gads?R(d.gads.totalSpend):'';
-  document.getElementById('fb30dCamps').innerHTML=renderFbCamps(d.fb?.campaigns||[]);
-  document.getElementById('g30dCamps').innerHTML=renderGCamps(d.gads?.campaigns||[]);
-  drawCharts(d.ga4);
-}
+function render7d(){renderPeriodData('7d');}
+function render30d(){renderPeriodData('30d');drawCharts(data['30d']?.ga4);}
 
 function drawCharts(ga4){
-  const trend=ga4?.dailyTrend||[], channels=(ga4?.channels||[]).slice(0,6);
+  const trend=ga4?.dailyTrend||[],channels=(ga4?.channels||[]).slice(0,6);
   if(charts.trend)charts.trend.destroy();
   if(charts.chan)charts.chan.destroy();
-  if(trend.length){
-    charts.trend=new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:trend.map(r=>r.date.slice(5)),datasets:[{label:'Receita',data:trend.map(r=>r.revenue||0),borderColor:'#c4602a',backgroundColor:'rgba(196,96,42,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$ '+Math.round(c.parsed.y).toLocaleString('pt-BR')},backgroundColor:'#1a1210',titleFont:{size:11},bodyFont:{size:11}}},scales:{x:{ticks:{font:{size:10},color:'#b0a098',maxRotation:0,autoSkip:true,maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:10},color:'#b0a098',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(0,0,0,0.06)'}}}}});
-  }
-  if(channels.length){
-    charts.chan=new Chart(document.getElementById('chanChart'),{type:'bar',data:{labels:channels.map(c=>c.name),datasets:[{label:'Receita',data:channels.map(c=>c.revenue||0),backgroundColor:'#1a6bba',borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$ '+Math.round(c.parsed.x).toLocaleString('pt-BR')},backgroundColor:'#1a1210',titleFont:{size:11},bodyFont:{size:11}}},scales:{x:{ticks:{font:{size:10},color:'#b0a098',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(0,0,0,0.06)'}},y:{ticks:{font:{size:11},color:'#7a6b62'},grid:{display:false}}}}});
-  }
+  if(trend.length){charts.trend=new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:trend.map(r=>r.date.slice(5)),datasets:[{label:'Receita',data:trend.map(r=>r.revenue||0),borderColor:'#c4602a',backgroundColor:'rgba(196,96,42,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$ '+Math.round(c.parsed.y).toLocaleString('pt-BR')},backgroundColor:'#1a1210',titleFont:{size:11},bodyFont:{size:11}}},scales:{x:{ticks:{font:{size:10},color:'#b0a098',maxRotation:0,autoSkip:true,maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:10},color:'#b0a098',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(0,0,0,0.06)'}}}}});}
+  if(channels.length){charts.chan=new Chart(document.getElementById('chanChart'),{type:'bar',data:{labels:channels.map(c=>c.name),datasets:[{label:'Receita',data:channels.map(c=>c.revenue||0),backgroundColor:'#1a6bba',borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$ '+Math.round(c.parsed.x).toLocaleString('pt-BR')},backgroundColor:'#1a1210',titleFont:{size:11},bodyFont:{size:11}}},scales:{x:{ticks:{font:{size:10},color:'#b0a098',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(0,0,0,0.06)'}},y:{ticks:{font:{size:11},color:'#7a6b62'},grid:{display:false}}}}});}
 }
 
 function renderFbCamps(rows){
