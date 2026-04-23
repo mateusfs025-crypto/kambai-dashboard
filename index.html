@@ -13,6 +13,15 @@
   --green-bg:#eaf5ec;--amber-bg:#fdf3e0;--red-bg:#faeaea;
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px 36px;width:100%;max-width:360px;text-align:center}
+.login-logo{font-size:22px;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:6px}
+.login-sub{font-size:13px;color:var(--t2);margin-bottom:28px}
+.login-box input{width:100%;padding:12px 16px;border-radius:10px;border:1px solid var(--border);font-size:16px;background:var(--s2);color:var(--text);outline:none;text-align:center;letter-spacing:.15em;margin-bottom:12px;transition:border .15s}
+.login-box input:focus{border-color:var(--accent)}
+.login-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s}
+.login-btn:hover{background:#a84d22}
+.login-err{font-size:12px;color:var(--red);margin-top:10px;min-height:18px}
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:10}
 .logo{font-size:15px;font-weight:700;letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
 .badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2)}
@@ -70,6 +79,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </head>
 <body>
 
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Kambai</div>
+    <div class="login-sub">Painel de Mídia — Acesso Restrito</div>
+    <input type="password" id="pwdInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPwd()">
+    <button class="login-btn" onclick="checkPwd()">Entrar</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<div id="main-app" style="display:none">
 <div class="topbar">
   <div style="display:flex;align-items:center;gap:12px">
     <span class="logo">Kambai</span>
@@ -121,8 +141,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
   <div class="footer" id="footer"></div>
 </div>
+</div>
 
 <script>
+const SENHA = 'kambai2026';
+const SESSION_KEY = 'kmb_auth';
+
+function checkPwd() {
+  const val = document.getElementById('pwdInput').value;
+  if (val === SENHA) {
+    sessionStorage.setItem(SESSION_KEY, '1');
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    loadAll();
+  } else {
+    document.getElementById('loginErr').textContent = 'Senha incorreta. Tente novamente.';
+    document.getElementById('pwdInput').value = '';
+    document.getElementById('pwdInput').focus();
+  }
+}
+
+if (sessionStorage.getItem(SESSION_KEY) === '1') {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+}
+
 const R = n => n==null?'—':'R$ '+Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const N = n => n==null?'—':Math.round(n).toLocaleString('pt-BR');
 const P = n => n==null?'—':(n*100).toFixed(2)+'%';
@@ -151,21 +194,16 @@ async function loadAll() {
   try {
     const res  = await fetch(`/api/ads?date=${todayStr}`);
     const data = await res.json();
-
     if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
-
     ads.fb   = data.fb   || [];
     ads.gads = data.gads || [];
-
     const t = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     setStatus(false, 'Atualizado às '+t);
     document.getElementById('footer').textContent = 'Dados de '+data.date+' via Windsor.ai · Atualizado: '+t;
     document.getElementById('msgBox').innerHTML = '';
-
   } catch(e) {
     setStatus(false, 'Erro');
     document.getElementById('msgBox').innerHTML = '<div class="err">❌ '+e.message+'</div>';
-    document.getElementById('footer').textContent = '';
   }
 
   renderAll();
@@ -189,7 +227,6 @@ function clearM() {
 function renderAll() {
   const fb   = ads.fb   || [];
   const gads = ads.gads || [];
-
   const fbSpend  = fb.reduce((s,r)=>s+(r.spend||0),0);
   const fbClicks = fb.reduce((s,r)=>s+(r.clicks||0),0);
   const fbReach  = fb.reduce((s,r)=>s+(r.reach||0),0);
@@ -197,22 +234,20 @@ function renderAll() {
   const gClicks  = gads.reduce((s,r)=>s+(r.clicks||0),0);
   const gConv    = gads.reduce((s,r)=>s+(r.conversions||0),0);
   const total    = fbSpend+gSpend;
-
   const ticket = (manRev&&manOrders) ? manRev/manOrders : null;
   const roas   = (manRev&&total>0)   ? manRev/total     : null;
   const cac    = (manOrders&&total>0)? total/manOrders  : null;
-
   const roasCls = !roas?'muted':roas>=3?'green':roas>=1.5?'':'amber';
 
   const kpis = [
-    {l:'Faturamento',  v:manRev?R(manRev):'—',   s:'Magazord',             cls:manRev?'green':'muted'},
-    {l:'Vendas',       v:manOrders?N(manOrders):'—', s:'pedidos',           cls:manOrders?'':'muted'},
-    {l:'Ticket médio', v:ticket?R(ticket):'—',    s:'faturamento ÷ vendas', cls:ticket?'':'muted'},
-    {l:'ROAS geral',   v:roas?X(roas):'—',        s:'faturamento ÷ gasto',  cls:roasCls},
-    {l:'Gasto total',  v:total>0?R(total):'...',  s:'Meta + Google Ads',    cls:''},
-    {l:'CAC',          v:cac?R(cac):'—',          s:'custo por venda',      cls:''},
-    {l:'Meta Ads',     v:fbSpend>0?R(fbSpend):'...', s:N(fbClicks)+' cliques · '+N(fbReach)+' alcance', cls:''},
-    {l:'Google Ads',   v:gSpend>0?R(gSpend):'...', s:N(gClicks)+' cliques · '+Math.round(gConv)+' conv.', cls:''},
+    {l:'Faturamento',  v:manRev?R(manRev):'—',        s:'Magazord',             cls:manRev?'green':'muted'},
+    {l:'Vendas',       v:manOrders?N(manOrders):'—',   s:'pedidos',              cls:manOrders?'':'muted'},
+    {l:'Ticket médio', v:ticket?R(ticket):'—',         s:'faturamento ÷ vendas', cls:ticket?'':'muted'},
+    {l:'ROAS geral',   v:roas?X(roas):'—',             s:'faturamento ÷ gasto',  cls:roasCls},
+    {l:'Gasto total',  v:total>0?R(total):'...',       s:'Meta + Google Ads',    cls:''},
+    {l:'CAC',          v:cac?R(cac):'—',               s:'custo por venda',      cls:''},
+    {l:'Meta Ads',     v:fbSpend>0?R(fbSpend):'...',   s:N(fbClicks)+' cliques · '+N(fbReach)+' alcance', cls:''},
+    {l:'Google Ads',   v:gSpend>0?R(gSpend):'...',     s:N(gClicks)+' cliques · '+Math.round(gConv)+' conv.', cls:''},
   ];
 
   document.getElementById('kpiGrid').innerHTML = kpis.map(k=>
@@ -261,8 +296,6 @@ function renderAll() {
       }).join('')
     : '<div style="font-size:12px;color:var(--t3);padding:8px 0">Sem campanhas ativas</div>';
 }
-
-loadAll();
 </script>
 </body>
 </html>
