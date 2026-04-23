@@ -31,7 +31,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .refresh-btn{padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--text);font-size:12px;cursor:pointer;font-weight:500}
 .refresh-btn:disabled{opacity:.4;cursor:default}
-.tabs{display:flex;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px}
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px}
 .tab{padding:12px 20px;font-size:13px;font-weight:600;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
@@ -103,7 +103,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <div id="main-app" style="display:none">
-
 <div class="topbar">
   <div style="display:flex;align-items:center;gap:12px">
     <span class="logo">Kambai</span>
@@ -111,13 +110,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
   <button class="refresh-btn" id="refreshBtn" onclick="refreshCurrent()">↻ Atualizar</button>
 </div>
-
 <div class="tabs">
   <div class="tab active" onclick="switchTab('hoje')">Hoje</div>
   <div class="tab" onclick="switchTab('7d')">7 dias</div>
   <div class="tab" onclick="switchTab('30d')">30 dias</div>
 </div>
 
+<!-- HOJE -->
 <div id="tab-hoje" class="tab-content active">
 <div class="wrap">
   <div class="manual-card">
@@ -143,6 +142,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 
+<!-- 7 DIAS -->
 <div id="tab-7d" class="tab-content">
 <div class="wrap">
   <div class="sec-label">Resumo — últimos 7 dias</div>
@@ -161,6 +161,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 
+<!-- 30 DIAS -->
 <div id="tab-30d" class="tab-content">
 <div class="wrap">
   <div class="sec-label">Resumo — últimos 30 dias</div>
@@ -182,7 +183,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="footer" id="footer30d"></div>
 </div>
 </div>
-
 </div>
 
 <script>
@@ -190,7 +190,7 @@ const SENHA='kambai2026', SK='kmb_auth';
 function checkPwd(){
   const v=document.getElementById('pwdInput').value;
   if(v===SENHA){sessionStorage.setItem(SK,'1');document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';loadToday();}
-  else{document.getElementById('loginErr').textContent='Senha incorreta. Tente novamente.';document.getElementById('pwdInput').value='';document.getElementById('pwdInput').focus();}
+  else{document.getElementById('loginErr').textContent='Senha incorreta.';document.getElementById('pwdInput').value='';document.getElementById('pwdInput').focus();}
 }
 if(sessionStorage.getItem(SK)==='1'){document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';}
 
@@ -209,13 +209,8 @@ function switchTab(tab){
   document.getElementById('tab-'+tab).classList.add('active');
   if(!data[tab]){if(tab==='hoje')loadToday();else loadPeriod(tab);}
 }
-
 function refreshCurrent(){data[currentTab]=null;if(currentTab==='hoje')loadToday();else loadPeriod(currentTab);}
-
-function setStatus(loading,msg){
-  document.getElementById('dot').className='dot'+(loading?' spin':'');
-  document.getElementById('status').textContent=msg;
-}
+function setStatus(loading,msg){document.getElementById('dot').className='dot'+(loading?' spin':'');document.getElementById('status').textContent=msg;}
 
 async function loadToday(){
   setStatus(true,'Buscando dados de hoje...');
@@ -224,14 +219,14 @@ async function loadToday(){
   document.getElementById('todayFbCamps').innerHTML='<div class="empty">Carregando...</div>';
   document.getElementById('todayGCamps').innerHTML='<div class="empty">Carregando...</div>';
   try{
-    const res=await fetch(`/api/ads?date=${todayStr}`);
+    const res=await fetch('/api/ads?date='+todayStr);
     const json=await res.json();
     if(!json.ok)throw new Error(json.error);
     data.today=json;
     const t=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     setStatus(false,'Atualizado às '+t);
     document.getElementById('todayFooter').textContent='Dados de hoje via Windsor.ai · '+t;
-  }catch(e){setStatus(false,'Erro');data.today={fb:[],gads:[]};}
+  }catch(e){setStatus(false,'Erro');data.today={fb:{totalSpend:0,totalClicks:0,totalReach:0,campaigns:[]},gads:{totalSpend:0,totalClicks:0,totalConversions:0,campaigns:[]}};}
   renderToday();
   document.getElementById('refreshBtn').disabled=false;
 }
@@ -243,20 +238,20 @@ function calcToday(){
   manOrders=parseFloat(rawO)>0?parseFloat(rawO):null;
   renderToday();
 }
-function clearToday(){
-  manRev=null;manOrders=null;
-  document.getElementById('iRev').value='';
-  document.getElementById('iOrders').value='';
-  renderToday();
-}
+function clearToday(){manRev=null;manOrders=null;document.getElementById('iRev').value='';document.getElementById('iOrders').value='';renderToday();}
 
 function renderToday(){
-  const d=data.today||{fb:[],gads:[]};
-  const fb=d.fb||[],ga=d.gads||[];
-  const fbS=fb.reduce((s,r)=>s+(r.spend||0),0),fbC=fb.reduce((s,r)=>s+(r.clicks||0),0),fbR=fb.reduce((s,r)=>s+(r.reach||0),0);
-  const gS=ga.reduce((s,r)=>s+(r.spend||0),0),gC=ga.reduce((s,r)=>s+(r.clicks||0),0),gV=ga.reduce((s,r)=>s+(r.conversions||0),0);
-  const tot=fbS+gS,ticket=(manRev&&manOrders)?manRev/manOrders:null,roas=(manRev&&tot>0)?manRev/tot:null,cac=(manOrders&&tot>0)?tot/manOrders:null;
+  const d=data.today||{};
+  const fb=d.fb||{totalSpend:0,totalClicks:0,totalReach:0,campaigns:[]};
+  const ga=d.gads||{totalSpend:0,totalClicks:0,totalConversions:0,campaigns:[]};
+  const fbS=fb.totalSpend||0, fbC=fb.totalClicks||0, fbR=fb.totalReach||0;
+  const gS=ga.totalSpend||0, gC=ga.totalClicks||0, gV=ga.totalConversions||0;
+  const tot=fbS+gS;
+  const ticket=(manRev&&manOrders)?manRev/manOrders:null;
+  const roas=(manRev&&tot>0)?manRev/tot:null;
+  const cac=(manOrders&&tot>0)?tot/manOrders:null;
   const rc=!roas?'muted':roas>=3?'green':roas>=1.5?'':'amber';
+
   document.getElementById('todayKpis').innerHTML=[
     {l:'Faturamento',v:manRev?R(manRev):'—',s:'Magazord',c:manRev?'green':'muted'},
     {l:'Vendas',v:manOrders?N(manOrders):'—',s:'pedidos',c:manOrders?'':'muted'},
@@ -265,11 +260,12 @@ function renderToday(){
     {l:'Meta Ads',v:fbS>0?R(fbS):'...',s:N(fbC)+' cliques · '+N(fbR)+' alcance',c:''},
     {l:'Google Ads',v:gS>0?R(gS):'...',s:N(gC)+' cliques · '+Math.round(gV)+' conv.',c:''},
   ].map(k=>`<div class="kpi ${k.c}"><div class="kpi-label">${k.l}</div><div class="kpi-val">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+
   document.getElementById('todayMsg').innerHTML=(!manRev&&!manOrders)?'<div class="hint">Preencha o faturamento e vendas do Magazord para calcular ROAS, ticket médio e CAC.</div>':'';
   document.getElementById('todayFbTotal').textContent=fbS>0?R(fbS):'';
   document.getElementById('todayGTotal').textContent=gS>0?R(gS):'';
-  document.getElementById('todayFbCamps').innerHTML=renderFbCamps(fb);
-  document.getElementById('todayGCamps').innerHTML=renderGCamps(ga);
+  document.getElementById('todayFbCamps').innerHTML=renderFbCamps(fb.campaigns||[]);
+  document.getElementById('todayGCamps').innerHTML=renderGCamps(ga.campaigns||[]);
 }
 
 async function loadPeriod(tab){
@@ -278,7 +274,7 @@ async function loadPeriod(tab){
   document.getElementById('refreshBtn').disabled=true;
   skels('kpis'+tab);
   try{
-    const res=await fetch(`/api/ads?period=${preset}`);
+    const res=await fetch('/api/ads?period='+preset);
     const json=await res.json();
     if(!json.ok)throw new Error(json.error);
     data[tab]=json;
@@ -291,9 +287,9 @@ async function loadPeriod(tab){
 }
 
 function renderPeriodKpis(tab){
-  const d=data[tab]||{},fb=d.fb,ga=d.gads,ga4=d.ga4;
-  const fbS=fb?.totalSpend||0,gS=ga?.totalSpend||0,tot=fbS+gS,rev=ga4?.totalRevenue||0;
-  const roas=tot>0?rev/tot:null,rc=!roas?'muted':roas>=3?'green':roas>=1.5?'':'amber';
+  const d=data[tab]||{}, fb=d.fb, ga=d.gads, ga4=d.ga4;
+  const fbS=fb?.totalSpend||0, gS=ga?.totalSpend||0, tot=fbS+gS, rev=ga4?.totalRevenue||0;
+  const roas=tot>0?rev/tot:null, rc=!roas?'muted':roas>=3?'green':roas>=1.5?'':'amber';
   return [
     {l:'Receita GA4',v:R(rev),s:(ga4?.totalTransactions||0)+' pedidos',c:''},
     {l:'ROAS geral',v:X(roas),s:'receita ÷ investimento',c:rc},
@@ -305,13 +301,13 @@ function renderPeriodKpis(tab){
 }
 
 function renderChannelTable(tab){
-  const d=data[tab]||{},fb=d.fb,ga=d.gads,ga4=d.ga4;
-  const fbS=fb?.totalSpend||0,gS=ga?.totalSpend||0;
+  const d=data[tab]||{}, fb=d.fb, ga=d.gads, ga4=d.ga4;
+  const fbS=fb?.totalSpend||0, gS=ga?.totalSpend||0;
   return (ga4?.channels||[]).map(ch=>{
     let spend=0;
     if(ch.name==='Facebook Ads')spend=fbS;
     if(ch.name==='Google Ads')spend=gS;
-    const roas=spend>0?ch.revenue/spend:null,conv=ch.sessions>0?(ch.transactions/ch.sessions)*100:0;
+    const roas=spend>0?ch.revenue/spend:null, conv=ch.sessions>0?(ch.transactions/ch.sessions)*100:0;
     const rc=roas==null?'rn':roas>=3?'rg':roas>=1.5?'ro':'rb';
     return `<tr><td style="font-weight:600">${ch.name}</td><td>${R(ch.revenue)}</td><td>${N(ch.transactions)}</td><td>${N(ch.sessions)}</td><td>${conv?conv.toFixed(1)+'%':'—'}</td><td>${spend?R(spend):'—'}</td><td class="${rc}">${X(roas)}</td></tr>`;
   }).join('')||'<tr><td colspan="7" class="empty">Sem dados</td></tr>';
@@ -339,7 +335,7 @@ function render30d(){
 }
 
 function drawCharts(ga4){
-  const trend=ga4?.dailyTrend||[],channels=(ga4?.channels||[]).slice(0,6);
+  const trend=ga4?.dailyTrend||[], channels=(ga4?.channels||[]).slice(0,6);
   if(charts.trend)charts.trend.destroy();
   if(charts.chan)charts.chan.destroy();
   if(trend.length){
@@ -353,15 +349,16 @@ function drawCharts(ga4){
 function renderFbCamps(rows){
   if(!rows||!rows.length)return '<div class="empty">Sem campanhas</div>';
   return [...rows].sort((a,b)=>b.spend-a.spend).map(c=>{
-    const ctr=c.ctr||0,pill=ctr>=0.025?`<span class="pill pill-g">CTR ${P(ctr)}</span>`:ctr>=0.01?`<span class="pill pill-a">CTR ${P(ctr)}</span>`:`<span class="pill pill-r">CTR ${P(ctr)}</span>`;
-    return `<div class="camp-row"><div class="camp-name">${c.campaign||c.name}</div><div class="camp-right"><div class="camp-spend">${R(c.spend)}</div><div class="camp-meta">${N(c.clicks)} cliques · CPC ${R(c.cpc)}</div>${pill}</div></div>`;
+    const ctr=c.ctr||0;
+    const pill=ctr>=0.025?`<span class="pill pill-g">CTR ${P(ctr)}</span>`:ctr>=0.01?`<span class="pill pill-a">CTR ${P(ctr)}</span>`:`<span class="pill pill-r">CTR ${P(ctr)}</span>`;
+    return `<div class="camp-row"><div class="camp-name">${c.name}</div><div class="camp-right"><div class="camp-spend">${R(c.spend)}</div><div class="camp-meta">${N(c.clicks)} cliques · CPC ${R(c.cpc)}</div>${pill}</div></div>`;
   }).join('');
 }
 function renderGCamps(rows){
   if(!rows||!rows.length)return '<div class="empty">Sem campanhas</div>';
   return [...rows].sort((a,b)=>b.spend-a.spend).map(c=>{
     const conv=Math.round(c.conversions||0);
-    return `<div class="camp-row"><div class="camp-name">${c.campaign||c.name}</div><div class="camp-right"><div class="camp-spend">${R(c.spend)}</div><div class="camp-meta">${N(c.clicks)} cliques · CPC ${R(c.cpc)}</div>${conv>0?`<span class="pill pill-g">${conv} conv.</span>`:''}</div></div>`;
+    return `<div class="camp-row"><div class="camp-name">${c.name}</div><div class="camp-right"><div class="camp-spend">${R(c.spend)}</div><div class="camp-meta">${N(c.clicks)} cliques · CPC ${R(c.cpc)}</div>${conv>0?`<span class="pill pill-g">${conv} conv.</span>`:''}</div></div>`;
   }).join('');
 }
 function skels(id){document.getElementById(id).innerHTML='<div class="skel"></div>'.repeat(6);}
