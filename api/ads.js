@@ -6,16 +6,15 @@ const GA4_ACC  = '379550350';
 async function askClaude(prompt) {
   const res = await fetch(ANTHROPIC_API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 8000,
-      system: `You are a data analyst with Windsor.ai MCP access. Return ONLY valid JSON, no markdown, no explanation.
-
-Accounts:
-- Facebook: connector="facebook", account="${FB_ACC}"
-- Google Ads: connector="google_ads", account="${GADS_ACC}"
-- GA4: connector="googleanalytics4", account="${GA4_ACC}"`,
+      system: `You are a data analyst with Windsor.ai MCP access. Return ONLY valid JSON, no markdown, no explanation.`,
       messages: [{ role: 'user', content: prompt }],
       mcp_servers: [{ type: 'url', url: 'https://mcp.windsor.ai', name: 'windsor-mcp' }]
     })
@@ -23,7 +22,7 @@ Accounts:
   const data = await res.json();
   const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
   const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Sem JSON na resposta');
+  if (!match) throw new Error('Sem JSON na resposta: ' + text.slice(0,200));
   return JSON.parse(match[0]);
 }
 
@@ -87,39 +86,34 @@ module.exports = async function(req, res) {
 
   try {
     if (date) {
-      const result = await askClaude(`
-Fetch today's data from Windsor.ai for date ${date}.
-Call these connectors:
-1. facebook account="${FB_ACC}" fields=["campaign","spend","clicks","impressions","ctr","cpc","reach","frequency"] date_from="${date}" date_to="${date}"
-2. google_ads account="${GADS_ACC}" fields=["campaign","spend","clicks","impressions","ctr","cpc","conversions"] date_from="${date}" date_to="${date}"
+      const result = await askClaude(`Fetch Windsor.ai data for date ${date}.
+Use these MCP calls:
+1. connector="facebook" account="${FB_ACC}" fields=["campaign","spend","clicks","impressions","ctr","cpc","reach","frequency"] date_from="${date}" date_to="${date}"
+2. connector="google_ads" account="${GADS_ACC}" fields=["campaign","spend","clicks","ctr","cpc","conversions"] date_from="${date}" date_to="${date}"
 
-Return this JSON only:
-{
-  "fb_rows": [{"campaign":"","spend":0,"clicks":0,"impressions":0,"ctr":0,"cpc":0,"reach":0}],
-  "gads_rows": [{"campaign":"","spend":0,"clicks":0,"conversions":0,"cpc":0}]
-}`);
-      const fb   = aggregateFB(result.fb_rows || []);
-      const gads = aggregateGAds(result.gads_rows || []);
-      return res.end(JSON.stringify({ ok:true, date, fb, gads }));
+Return ONLY this JSON:
+{"fb_rows":[{"campaign":"","spend":0,"clicks":0,"impressions":0,"ctr":0,"cpc":0,"reach":0}],"gads_rows":[{"campaign":"","spend":0,"clicks":0,"conversions":0,"cpc":0}]}`);
+
+      return res.end(JSON.stringify({ok:true, date,
+        fb:   aggregateFB(result.fb_rows||[]),
+        gads: aggregateGAds(result.gads_rows||[])
+      }));
 
     } else if (period) {
-      const result = await askClaude(`
-Fetch data from Windsor.ai for period "${period}".
-Call these connectors:
-1. facebook account="${FB_ACC}" fields=["date","campaign","spend","clicks","impressions","ctr","cpc"] date_preset="${period}"
-2. google_ads account="${GADS_ACC}" fields=["date","campaign","spend","clicks","conversions","cpc"] date_preset="${period}"
-3. googleanalytics4 account="${GA4_ACC}" fields=["date","source","medium","sessions","transactions","totalrevenue","newusers"] date_preset="${period}"
+      const result = await askClaude(`Fetch Windsor.ai data for period "${period}".
+Use these MCP calls:
+1. connector="facebook" account="${FB_ACC}" fields=["date","campaign","spend","clicks","impressions","ctr","cpc"] date_preset="${period}"
+2. connector="google_ads" account="${GADS_ACC}" fields=["date","campaign","spend","clicks","conversions","cpc"] date_preset="${period}"
+3. connector="googleanalytics4" account="${GA4_ACC}" fields=["date","source","medium","sessions","transactions","totalrevenue","newusers"] date_preset="${period}"
 
-Return this JSON only:
-{
-  "fb_rows": [{"date":"","campaign":"","spend":0,"clicks":0,"impressions":0,"ctr":0,"cpc":0}],
-  "gads_rows": [{"date":"","campaign":"","spend":0,"clicks":0,"conversions":0,"cpc":0}],
-  "ga4_rows": [{"date":"","source":"","medium":"","sessions":0,"transactions":0,"totalrevenue":0,"newusers":0}]
-}`);
-      const fb   = aggregateFB(result.fb_rows || []);
-      const gads = aggregateGAds(result.gads_rows || []);
-      const ga4  = aggregateGA4(result.ga4_rows || []);
-      return res.end(JSON.stringify({ ok:true, period, fb, gads, ga4 }));
+Return ONLY this JSON:
+{"fb_rows":[{"date":"","campaign":"","spend":0,"clicks":0,"ctr":0,"cpc":0}],"gads_rows":[{"date":"","campaign":"","spend":0,"clicks":0,"conversions":0,"cpc":0}],"ga4_rows":[{"date":"","source":"","medium":"","sessions":0,"transactions":0,"totalrevenue":0,"newusers":0}]}`);
+
+      return res.end(JSON.stringify({ok:true, period,
+        fb:   aggregateFB(result.fb_rows||[]),
+        gads: aggregateGAds(result.gads_rows||[]),
+        ga4:  aggregateGA4(result.ga4_rows||[])
+      }));
 
     } else {
       return res.status(400).end(JSON.stringify({ok:false,error:'Faltou date ou period'}));
