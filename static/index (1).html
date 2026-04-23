@@ -1,306 +1,35 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kambai — Painel de Mídia</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f4f1; color: #1a1a1a; min-height: 100vh; }
-  .topbar { background: #fff; border-bottom: 1px solid #e8ddd5; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
-  .logo { font-size: 15px; font-weight: 700; letter-spacing: 0.08em; color: #7a4f2e; text-transform: uppercase; }
-  .logo span { color: #c4895e; }
-  .topbar-date { font-size: 12px; color: #a07860; }
-  .container { max-width: 1000px; margin: 0 auto; padding: 24px 20px; }
-  .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
-  .dash-title { font-size: 17px; font-weight: 600; color: #3a2518; }
-  .controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-  .period-btn { font-size: 12px; padding: 6px 13px; border: 1px solid #d4c4b8; border-radius: 20px; background: transparent; color: #7a6055; cursor: pointer; }
-  .period-btn.active { background: #7a4f2e; color: #fff; border-color: #7a4f2e; }
-  .refresh-btn { font-size: 12px; padding: 6px 13px; border: 1px solid #d4c4b8; border-radius: 20px; background: #fff; color: #7a6055; cursor: pointer; }
+from flask import Flask, request, jsonify, send_file
+import requests
+import os
 
-  .revenue-box { background: #fff; border: 1px solid #ede0d8; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-  .revenue-labels { flex-shrink: 0; }
-  .revenue-title { font-size: 13px; font-weight: 600; color: #7a4f2e; }
-  .revenue-hint { font-size: 11px; color: #a07860; margin-top: 2px; }
-  .revenue-inputs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .rev-field { display: flex; align-items: center; gap: 6px; }
-  .rev-field label { font-size: 11px; color: #a07860; white-space: nowrap; }
-  .rev-field input { padding: 7px 10px; border: 1.5px solid #d4c4b8; border-radius: 8px; font-size: 14px; font-weight: 600; color: #3a2518; background: #fdfaf8; width: 130px; outline: none; }
-  .rev-field input:focus { border-color: #c4895e; }
-  .apply-btn { padding: 8px 16px; background: #c4895e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-  .apply-btn:hover { background: #a8704a; }
-  .rev-badge { font-size: 11px; padding: 3px 10px; border-radius: 10px; font-weight: 600; margin-left: auto; }
-  .badge-ok { background: #EAF3DE; color: #3B6D11; }
-  .badge-wait { background: #f0e8e0; color: #7a4f2e; }
+app = Flask(__name__)
 
-  .cards { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 12px; }
-  .card { background: #fff; border-radius: 12px; padding: 16px 18px; border: 1px solid #ede0d8; }
-  .card.main { background: #7a4f2e; border-color: #7a4f2e; }
-  .card-label { font-size: 10px; color: #a07860; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 7px; }
-  .card.main .card-label { color: rgba(255,255,255,.55); }
-  .card-value { font-size: 22px; font-weight: 600; color: #3a2518; line-height: 1; }
-  .card.main .card-value { color: #fff; }
-  .card-sub { font-size: 11px; color: #a07860; margin-top: 5px; }
-  .card.main .card-sub { color: rgba(255,255,255,.5); }
-  .ok { color: #3B6D11 !important; }
-  .warn { color: #854F0B !important; }
-  .bad { color: #A32D2D !important; }
+WINDSOR_KEY = 'af49eacb41a92fa489a714e8dd18c47d8114'
 
-  .section-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #a07860; margin: 16px 0 8px; }
-  .channels { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
-  .ch { background: #fff; border: 1px solid #ede0d8; border-radius: 12px; padding: 14px 16px; }
-  .ch-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .ch-name { font-size: 13px; font-weight: 600; color: #3a2518; display: flex; align-items: center; gap: 7px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .bdg { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
-  .bdg-ok { background: #EAF3DE; color: #27500A; }
-  .bdg-warn { background: #FAEEDA; color: #633806; }
-  .bdg-bad { background: #FCEBEB; color: #791F1F; }
-  .bdg-n { background: #f0e8e0; color: #7a4f2e; }
-  .row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f5ede8; }
-  .row:last-child { border-bottom: none; }
-  .rk { font-size: 12px; color: #a07860; }
-  .rv { font-size: 12px; font-weight: 600; color: #3a2518; }
+@app.route('/')
+def index():
+    # Tenta encontrar o index.html independente do nome
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    for fname in os.listdir(static_dir):
+        if fname.lower().endswith('.html'):
+            return send_file(os.path.join(static_dir, fname))
+    return 'Dashboard não encontrado', 404
 
-  .footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
-  .last-update { font-size: 11px; color: #b09080; }
+@app.route('/api/windsor')
+def windsor():
+    connector = request.args.get('connector')
+    date_from = request.args.get('date_from')
+    date_to   = request.args.get('date_to')
+    fields    = request.args.get('fields')
+    url = f"https://connectors.windsor.ai/{connector}?api_key={WINDSOR_KEY}&date_from={date_from}&date_to={date_to}&fields={fields}&force_refresh=true"
+    try:
+        r = requests.get(url, timeout=30)
+        data = r.json()
+        rows = data if isinstance(data, list) else data.get('data', data.get('results', []))
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-  .loading { text-align: center; padding: 60px 0; color: #a07860; font-size: 14px; }
-  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #e8ddd5; border-top-color: #c4895e; border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: middle; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .error-msg { text-align: center; padding: 50px 20px; color: #A32D2D; font-size: 13px; }
-
-  @media(max-width: 680px) {
-    .cards { grid-template-columns: 1fr 1fr; }
-    .channels { grid-template-columns: 1fr; }
-    .container { padding: 16px; }
-    .revenue-box { gap: 10px; }
-  }
-  @media(max-width: 420px) {
-    .cards { grid-template-columns: 1fr; }
-  }
-</style>
-</head>
-<body>
-
-<div class="topbar">
-  <div class="logo">Kam<span>bai</span> — Painel de Mídia</div>
-  <div class="topbar-date" id="ts">—</div>
-</div>
-
-<div class="container">
-
-  <div class="dash-header">
-    <div class="dash-title">Visão Geral</div>
-    <div class="controls">
-      <button class="period-btn active" onclick="load('today',this)">Hoje</button>
-      <button class="period-btn" onclick="load('yesterday',this)">Ontem</button>
-      <button class="period-btn" onclick="load('7d',this)">7 dias</button>
-      <button class="period-btn" onclick="load('30d',this)">30 dias</button>
-      <button class="refresh-btn" onclick="load(currentPeriod,null)">↻ Atualizar</button>
-    </div>
-  </div>
-
-  <div class="revenue-box">
-    <div class="revenue-labels">
-      <div class="revenue-title">Faturamento Real (Magazord)</div>
-      <div class="revenue-hint">Preencha com os dados do Magazord</div>
-    </div>
-    <div class="revenue-inputs">
-      <div class="rev-field">
-        <label>R$</label>
-        <input type="number" id="inp-revenue" placeholder="0,00" step="0.01" min="0" />
-      </div>
-      <div class="rev-field">
-        <label>Pedidos</label>
-        <input type="number" id="inp-orders" placeholder="0" step="1" min="0" style="width:90px;" />
-      </div>
-      <button class="apply-btn" onclick="applyRevenue()">Aplicar</button>
-    </div>
-    <span class="rev-badge badge-wait" id="rev-badge">Aguardando</span>
-  </div>
-
-  <div id="content"><div class="loading"><span class="spinner"></span>Buscando dados...</div></div>
-
-  <div class="footer">
-    <span class="last-update" id="last-update"></span>
-  </div>
-
-</div>
-
-<script>
-let currentPeriod = 'today';
-let manualRevenue = null;
-let manualOrders = null;
-let lastData = null;
-
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function daysAgoStr(n) { const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().split('T')[0]; }
-
-function getRange(p) {
-  const t = todayStr();
-  if (p==='today')     return { from: t,              to: t,              label: 'Hoje' };
-  if (p==='yesterday') return { from: daysAgoStr(1),  to: daysAgoStr(1),  label: 'Ontem' };
-  if (p==='7d')        return { from: daysAgoStr(7),  to: t,              label: 'Últimos 7 dias' };
-  if (p==='30d')       return { from: daysAgoStr(30), to: t,              label: 'Últimos 30 dias' };
-}
-
-const fmt = n => 'R$ ' + Number(n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-const pct = n => Number(n||0).toFixed(1)+'%';
-const roasCls = r => r>=3?'bdg-ok':r>=2?'bdg-warn':'bdg-bad';
-const costCls = p => p<=30?'ok':p<=50?'warn':'bad';
-const sum = (rows,f) => (rows||[]).reduce((a,r)=>a+(parseFloat(r[f])||0),0);
-
-function parseMetaRoas(raw) {
-  if (!raw) return 0;
-  if (typeof raw === 'number') return raw;
-  if (Array.isArray(raw)) { const i = raw.find(x=>x.action_type==='omni_purchase')||raw[0]; return i?parseFloat(i.value):0; }
-  return parseFloat(raw)||0;
-}
-
-async function fetchWindsor(connector, from, to, fields) {
-  const params = new URLSearchParams({ connector, date_from: from, date_to: to, fields: fields.join(',') });
-  const r = await fetch(`/api/windsor?${params}`);
-  if (!r.ok) throw new Error(`Erro ${r.status} em ${connector}`);
-  const d = await r.json();
-  return Array.isArray(d) ? d : (d.data || d.results || []);
-}
-
-function applyRevenue() {
-  const rev = parseFloat(document.getElementById('inp-revenue').value);
-  const ord = parseInt(document.getElementById('inp-orders').value);
-  if (!rev||rev<=0) { alert('Digite o faturamento!'); return; }
-  manualRevenue = rev;
-  manualOrders = ord||0;
-  document.getElementById('rev-badge').textContent = '✓ Magazord';
-  document.getElementById('rev-badge').className = 'rev-badge badge-ok';
-  if (lastData) renderDash(lastData);
-}
-
-function renderDash(data) {
-  const { metaRows, gadsRows, gaRows, label } = data;
-
-  const metaSpend  = sum(metaRows,'spend');
-  const metaClicks = sum(metaRows,'clicks');
-  const metaImpr   = sum(metaRows,'impressions');
-  const metaCpm    = metaImpr>0?(metaSpend/metaImpr)*1000:0;
-  const metaCpc    = metaClicks>0?metaSpend/metaClicks:0;
-  const metaRoas   = metaRows[0]?parseMetaRoas(metaRows[0].purchase_roas):0;
-
-  const gadsSpend  = sum(gadsRows,'spend');
-  const gadsConv   = sum(gadsRows,'conversion_value');
-  const gadsClicks = sum(gadsRows,'clicks');
-  const gadsCpc    = gadsClicks>0?gadsSpend/gadsClicks:0;
-  const gadsRoas   = gadsSpend>0?gadsConv/gadsSpend:0;
-
-  const gaRevenue  = sum(gaRows,'purchase_revenue');
-  const gaTrans    = sum(gaRows,'transactions');
-  const gaSessions = sum(gaRows,'sessions');
-
-  const revenue    = manualRevenue!==null ? manualRevenue : gaRevenue;
-  const orders     = manualOrders!==null && manualOrders>0 ? manualOrders : Math.round(gaTrans);
-  const isManual   = manualRevenue!==null;
-  const totalSpend = metaSpend+gadsSpend;
-  const costPct    = revenue>0?(totalSpend/revenue)*100:0;
-  const roas       = totalSpend>0?revenue/totalSpend:0;
-  const ticket     = orders>0?revenue/orders:0;
-  const convRate   = gaSessions>0?(gaTrans/gaSessions)*100:0;
-  const mCostPct   = revenue>0?(metaSpend/revenue)*100:0;
-  const gCostPct   = revenue>0?(gadsSpend/revenue)*100:0;
-  const lucro      = revenue-totalSpend;
-
-  document.getElementById('content').innerHTML = `
-  <div class="cards">
-    <div class="card main">
-      <div class="card-label">Custo de mídia</div>
-      <div class="card-value">${pct(costPct)}</div>
-      <div class="card-sub">do faturamento — ${label}</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Faturamento</div>
-      <div class="card-value" style="font-size:18px">${fmt(revenue)}</div>
-      <div class="card-sub">${isManual?'✓ Magazord':'GA4 estimado'} · ${orders} pedidos · ticket ${fmt(ticket)}</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Gasto total mídia</div>
-      <div class="card-value" style="font-size:18px">${fmt(totalSpend)}</div>
-      <div class="card-sub">Meta ${fmt(metaSpend)} + Google ${fmt(gadsSpend)}</div>
-    </div>
-    <div class="card">
-      <div class="card-label">ROAS real</div>
-      <div class="card-value ${costCls(costPct)}">${roas.toFixed(2)}x</div>
-      <div class="card-sub">Lucro após mídia ${fmt(lucro)}</div>
-    </div>
-  </div>
-
-  <div class="section-label">Por canal</div>
-  <div class="channels">
-    <div class="ch">
-      <div class="ch-hd">
-        <span class="ch-name"><span class="dot" style="background:#c4895e"></span>Magazord</span>
-        <span class="bdg ${isManual?'bdg-ok':'bdg-n'}">${isManual?'✓ Manual':'GA4'}</span>
-      </div>
-      <div class="row"><span class="rk">Faturamento</span><span class="rv">${fmt(revenue)}</span></div>
-      <div class="row"><span class="rk">Pedidos</span><span class="rv">${orders}</span></div>
-      <div class="row"><span class="rk">Ticket médio</span><span class="rv">${fmt(ticket)}</span></div>
-      <div class="row"><span class="rk">Sessões (GA4)</span><span class="rv">${Math.round(gaSessions).toLocaleString('pt-BR')}</span></div>
-      <div class="row"><span class="rk">Conv. rate</span><span class="rv">${pct(convRate)}</span></div>
-    </div>
-    <div class="ch">
-      <div class="ch-hd">
-        <span class="ch-name"><span class="dot" style="background:#1877F2"></span>Meta Ads</span>
-        <span class="bdg ${roasCls(metaRoas)}">ROAS ${metaRoas.toFixed(2)}x</span>
-      </div>
-      <div class="row"><span class="rk">Gasto</span><span class="rv">${fmt(metaSpend)}</span></div>
-      <div class="row"><span class="rk">% do faturamento</span><span class="rv ${costCls(mCostPct)}">${pct(mCostPct)}</span></div>
-      <div class="row"><span class="rk">Cliques</span><span class="rv">${Math.round(metaClicks).toLocaleString('pt-BR')}</span></div>
-      <div class="row"><span class="rk">CPM</span><span class="rv">${fmt(metaCpm)}</span></div>
-      <div class="row"><span class="rk">CPC</span><span class="rv">${fmt(metaCpc)}</span></div>
-    </div>
-    <div class="ch">
-      <div class="ch-hd">
-        <span class="ch-name"><span class="dot" style="background:#EA4335"></span>Google Ads</span>
-        <span class="bdg ${roasCls(gadsRoas)}">ROAS ${gadsRoas.toFixed(2)}x</span>
-      </div>
-      <div class="row"><span class="rk">Gasto</span><span class="rv">${fmt(gadsSpend)}</span></div>
-      <div class="row"><span class="rk">% do faturamento</span><span class="rv ${costCls(gCostPct)}">${pct(gCostPct)}</span></div>
-      <div class="row"><span class="rk">Cliques</span><span class="rv">${Math.round(gadsClicks).toLocaleString('pt-BR')}</span></div>
-      <div class="row"><span class="rk">Conv. atribuída</span><span class="rv">${fmt(gadsConv)}</span></div>
-      <div class="row"><span class="rk">CPC</span><span class="rv">${fmt(gadsCpc)}</span></div>
-    </div>
-  </div>`;
-
-  document.getElementById('last-update').textContent = 'Atualizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  document.getElementById('ts').textContent = new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
-}
-
-async function load(period, btn) {
-  currentPeriod = period;
-  manualRevenue = null;
-  manualOrders = null;
-  document.getElementById('inp-revenue').value = '';
-  document.getElementById('inp-orders').value = '';
-  document.getElementById('rev-badge').textContent = 'Aguardando';
-  document.getElementById('rev-badge').className = 'rev-badge badge-wait';
-  if (btn) { document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
-  document.getElementById('content').innerHTML = '<div class="loading"><span class="spinner"></span>Buscando dados...</div>';
-
-  try {
-    const { from, to, label } = getRange(period);
-    const [metaRows, gadsRows, gaRows] = await Promise.all([
-      fetchWindsor('facebook',         from, to, ['spend','purchase_roas','clicks','impressions']),
-      fetchWindsor('google_ads',        from, to, ['spend','conversion_value','clicks','impressions']),
-      fetchWindsor('googleanalytics4',  from, to, ['purchase_revenue','transactions','sessions'])
-    ]);
-    lastData = { metaRows, gadsRows, gaRows, label };
-    renderDash(lastData);
-  } catch(e) {
-    document.getElementById('content').innerHTML = `<div class="error-msg">Erro: ${e.message}</div>`;
-  }
-}
-
-load('today', null);
-</script>
-</body>
-</html>
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
