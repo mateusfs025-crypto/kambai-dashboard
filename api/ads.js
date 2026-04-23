@@ -44,26 +44,29 @@ function aggregateGA4(rows) {
   };
 }
 
-function aggregateFB(rows) {
+function aggregateFB(rows, filterDate) {
+  const norm = r => (r.date||'').slice(0,10);
+  const filtered = filterDate ? rows.filter(r => norm(r) === filterDate) : rows;
   const camps={};
-  let spend=0,clicks=0,impr=0,ctrSum=0,ctrN=0;
-  (rows||[]).forEach(r=>{
+  let spend=0,clicks=0,impr=0;
+  filtered.forEach(r=>{
     const n=r.campaign||'(sem nome)';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,impressions:0};
     camps[n].spend+=r.spend||0;camps[n].clicks+=r.clicks||0;camps[n].impressions+=r.impressions||0;
     spend+=r.spend||0;clicks+=r.clicks||0;impr+=r.impressions||0;
-    if(r.ctr){ctrSum+=r.ctr;ctrN++;}
   });
   const campaigns=Object.values(camps)
     .map(c=>({...c,ctr:c.impressions?c.clicks/c.impressions:0,cpc:c.clicks?c.spend/c.clicks:0}))
     .sort((a,b)=>b.spend-a.spend);
-  return {totalSpend:spend,totalClicks:clicks,totalImpressions:impr,avgCTR:ctrN?ctrSum/ctrN:0,campaigns};
+  return {totalSpend:spend,totalClicks:clicks,totalImpressions:impr,campaigns};
 }
 
-function aggregateGAds(rows) {
+function aggregateGAds(rows, filterDate) {
+  const norm = r => (r.date||'').slice(0,10);
+  const filtered = filterDate ? rows.filter(r => norm(r) === filterDate) : rows;
   const camps={};
   let spend=0,clicks=0,conv=0;
-  (rows||[]).forEach(r=>{
+  filtered.forEach(r=>{
     const n=r.campaign||'(sem nome)';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,conversions:0,cpcSum:0,cpcN:0};
     camps[n].spend+=r.spend||0;camps[n].clicks+=r.clicks||0;camps[n].conversions+=r.conversions||0;
@@ -81,13 +84,18 @@ module.exports = async function handler(req, res) {
 
   try {
     if (date) {
-      // HOJE — server-side, date_from/date_to funciona perfeitamente
+      // HOJE — inclui campo date para filtrar com precisão no servidor
       const [fbR, gR] = await Promise.allSettled([
-        fetchW('facebook',   ['campaign','spend','impressions','clicks','ctr','cpc','reach','frequency'], FB_ACC,  {date_from:date, date_to:date}),
-        fetchW('google_ads', ['campaign','spend','impressions','clicks','ctr','cpc','conversions','cost_per_conversion'], GADS_ACC, {date_from:date, date_to:date})
+        fetchW('facebook',   ['date','campaign','spend','impressions','clicks','ctr','cpc','reach','frequency'], FB_ACC,  {date_from:date, date_to:date}),
+        fetchW('google_ads', ['date','campaign','spend','impressions','clicks','ctr','cpc','conversions'], GADS_ACC, {date_from:date, date_to:date})
       ]);
-      const fb   = (fbR.status==='fulfilled'  ? fbR.value  : []).filter(r=>(r.spend||0)>0);
-      const gads = (gR.status==='fulfilled'   ? gR.value   : []).filter(r=>(r.spend||0)>0);
+      const fbAll  = fbR.status==='fulfilled'  ? fbR.value  : [];
+      const gAll   = gR.status==='fulfilled'   ? gR.value   : [];
+
+      // Filtra pelo dia exato para garantir que não vem dias extras
+      const fb   = aggregateFB(fbAll, date);
+      const gads = aggregateGAds(gAll, date);
+
       res.status(200).json({ok:true, date, fb, gads});
 
     } else if (period) {
