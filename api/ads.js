@@ -8,35 +8,61 @@ async function get(connector, fields, account, extra) {
   const p = new URLSearchParams({ api_key: KEY, fields: fields.join(',') });
   p.append('accounts[]', account);
   Object.entries(extra).forEach(([k,v]) => p.set(k,v));
-  const r = await fetch(`${BASE}/${connector}?${p}`);
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), 8000);
+  const r = await fetch(`${BASE}/${connector}?${p}`, { signal: ctrl.signal });
   const d = await r.json();
   return Array.isArray(d) ? d : (d.data || []);
 }
 
+function extractMetaRoas(v) {
+  if (!v || !Array.isArray(v)) return null;
+  const item = v.find(r => r.action_type === 'omni_purchase');
+  return item ? parseFloat(item.value) : null;
+}
+
 function sumFB(rows) {
-  const camps={};let spend=0,clicks=0,reach=0;
-  (rows||[]).filter(r=>(r.spend||0)>0).forEach(r=>{
+  const camps={};let spend=0,clicks=0,reach=0,impr=0;
+  (rows||[]).filter(r=>(parseFloat(r.spend)||0)>0).forEach(r=>{
     const n=r.campaign||'?';
-    if(!camps[n])camps[n]={name:n,spend:0,clicks:0,ctr:0,cpc:0};
-    camps[n].spend+=r.spend||0;camps[n].clicks+=r.clicks||0;
-    camps[n].ctr=r.ctr||0;camps[n].cpc=r.cpc||0;
-    spend+=r.spend||0;clicks+=r.clicks||0;reach+=r.reach||0;
+    if(!camps[n])camps[n]={name:n,spend:0,clicks:0,ctr:0,cpc:0,cpm:0,reach:0,frequency:0,roas:null};
+    camps[n].spend    += parseFloat(r.spend)||0;
+    camps[n].clicks   += parseFloat(r.clicks)||0;
+    camps[n].ctr       = r.ctr||0;
+    camps[n].cpc       = r.cpc||0;
+    camps[n].cpm       = r.cpm||0;
+    camps[n].reach    += parseFloat(r.reach)||0;
+    camps[n].frequency = r.frequency||0;
+    camps[n].roas      = extractMetaRoas(r.purchase_roas);
+    spend += parseFloat(r.spend)||0;
+    clicks+= parseFloat(r.clicks)||0;
+    reach += parseFloat(r.reach)||0;
+    impr  += parseFloat(r.impressions)||0;
   });
-  return {totalSpend:spend,totalClicks:clicks,totalReach:reach,
+  return {totalSpend:spend,totalClicks:clicks,totalReach:reach,totalImpressions:impr,
     campaigns:Object.values(camps).sort((a,b)=>b.spend-a.spend)};
 }
 
 function sumG(rows) {
-  const camps={};let spend=0,clicks=0,conv=0;
-  (rows||[]).filter(r=>(r.spend||0)>0).forEach(r=>{
+  const camps={};let spend=0,clicks=0,conv=0,convVal=0;
+  (rows||[]).filter(r=>(parseFloat(r.spend)||0)>0).forEach(r=>{
     const n=r.campaign||'?';
-    if(!camps[n])camps[n]={name:n,spend:0,clicks:0,conversions:0,cpc:0};
-    camps[n].spend+=r.spend||0;camps[n].clicks+=r.clicks||0;
-    camps[n].conversions+=r.conversions||0;camps[n].cpc=r.cpc||0;
-    spend+=r.spend||0;clicks+=r.clicks||0;conv+=r.conversions||0;
+    if(!camps[n])camps[n]={name:n,spend:0,clicks:0,conversions:0,conversionValue:0,cpc:0,roas:null};
+    camps[n].spend          += parseFloat(r.spend)||0;
+    camps[n].clicks         += parseFloat(r.clicks)||0;
+    camps[n].conversions    += parseFloat(r.conversions)||0;
+    camps[n].conversionValue+= parseFloat(r.conversion_value)||0;
+    camps[n].cpc             = r.cpc||0;
+    const roasRaw = parseFloat(r.roas)||0;
+    camps[n].roas = roasRaw>0 ? roasRaw/100 : null;
+    spend   += parseFloat(r.spend)||0;
+    clicks  += parseFloat(r.clicks)||0;
+    conv    += parseFloat(r.conversions)||0;
+    convVal += parseFloat(r.conversion_value)||0;
   });
-  return {totalSpend:spend,totalClicks:clicks,totalConversions:conv,
-    campaigns:Object.values(camps).sort((a,b)=>b.spend-a.spend)};
+  const totalRoas = spend>0&&convVal>0 ? convVal/spend : null;
+  return {totalSpend:spend,totalClicks:clicks,totalConversions:conv,totalConversionValue:convVal,totalRoas,
+    campaigns:Object.values(camps).map(c=>({...c,roas:c.conversionValue>0&&c.spend>0?c.conversionValue/c.spend:null})).sort((a,b)=>b.spend-a.spend)};
 }
 
 function sumGA4(rows) {
@@ -52,9 +78,9 @@ function sumGA4(rows) {
     else if(med==='organic')c='Orgânico';
     else if(src==='edrone'||med==='email')c='Email';
     if(!ch[c])ch[c]={name:c,revenue:0,transactions:0,sessions:0};
-    ch[c].revenue+=r.totalrevenue||0;ch[c].transactions+=r.transactions||0;ch[c].sessions+=r.sessions||0;
-    rev+=r.totalrevenue||0;tx+=r.transactions||0;sess+=r.sessions||0;newu+=r.newusers||0;
-    if(r.date){const d=r.date.slice(0,10);if(!byDay[d])byDay[d]={date:d,revenue:0,transactions:0};byDay[d].revenue+=r.totalrevenue||0;byDay[d].transactions+=r.transactions||0;}
+    ch[c].revenue+=parseFloat(r.totalrevenue)||0;ch[c].transactions+=parseFloat(r.transactions)||0;ch[c].sessions+=parseFloat(r.sessions)||0;
+    rev+=parseFloat(r.totalrevenue)||0;tx+=parseFloat(r.transactions)||0;sess+=parseFloat(r.sessions)||0;newu+=parseFloat(r.newusers)||0;
+    if(r.date){const d=r.date.slice(0,10);if(!byDay[d])byDay[d]={date:d,revenue:0,transactions:0};byDay[d].revenue+=parseFloat(r.totalrevenue)||0;byDay[d].transactions+=parseFloat(r.transactions)||0;}
   });
   return {totalRevenue:rev,totalTransactions:tx,totalSessions:sess,totalNewUsers:newu,
     channels:Object.values(ch).sort((a,b)=>b.revenue-a.revenue),
@@ -68,18 +94,22 @@ module.exports = async function(req, res) {
   try {
     if (date) {
       const [fbR,gR] = await Promise.allSettled([
-        get('facebook',  ['campaign','spend','clicks','impressions','ctr','cpc','reach'],FB_ACC,  {date_from:date,date_to:date}),
-        get('google_ads',['campaign','spend','clicks','ctr','cpc','conversions'],        GADS_ACC, {date_from:date,date_to:date})
+        get('facebook',  ['date','campaign','spend','clicks','impressions','ctr','cpc','cpm','reach','frequency','purchase_roas'],FB_ACC,  {date_preset:'last_3dT'}),
+        get('google_ads',['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],               GADS_ACC, {date_preset:'last_3dT'})
       ]);
+      const fbAll = fbR.status==='fulfilled'?fbR.value:[];
+      const gAll  = gR.status==='fulfilled'?gR.value:[];
+      const todayFb = fbAll.filter(r=>(r.date||'').slice(0,10)===date&&(parseFloat(r.spend)||0)>0);
+      const todayG  = gAll.filter(r=>(r.date||'').slice(0,10)===date&&(parseFloat(r.spend)||0)>0);
       return res.end(JSON.stringify({ok:true,date,
-        fb:   sumFB(fbR.status==='fulfilled'?fbR.value:[]),
-        gads: sumG(gR.status==='fulfilled'?gR.value:[])
+        fb:   sumFB(todayFb.length?todayFb:fbAll),
+        gads: sumG(todayG.length?todayG:gAll)
       }));
     } else if (period) {
       const [fbR,gR,ga4R] = await Promise.allSettled([
-        get('facebook',        ['date','campaign','spend','clicks','impressions','ctr','cpc'],          FB_ACC,  {date_preset:period}),
-        get('google_ads',      ['date','campaign','spend','clicks','conversions','cpc'],                GADS_ACC,{date_preset:period}),
-        get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],GA4_ACC,{date_preset:period})
+        get('facebook',        ['date','campaign','spend','clicks','impressions','ctr','cpc','cpm','reach','frequency','purchase_roas'],FB_ACC,  {date_preset:period}),
+        get('google_ads',      ['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],               GADS_ACC,{date_preset:period}),
+        get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],                          GA4_ACC, {date_preset:period})
       ]);
       return res.end(JSON.stringify({ok:true,period,
         fb:   fbR.status==='fulfilled'?sumFB(fbR.value):null,
