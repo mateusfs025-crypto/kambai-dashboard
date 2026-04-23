@@ -1,16 +1,41 @@
-const KEY      = 'af49eacb41a92fa489a714e8dd18c47d8114';
-const FB_ACC   = '2858329897589220';
-const GADS_ACC = '159-714-9501';
-const GA4_ACC  = '379550350';
-const BASE     = 'https://connectors.windsor.ai';
+const ANTHROPIC_API  = 'https://api.anthropic.com/v1/messages';
+const WINDSOR_KEY    = 'af49eacb41a92fa489a714e8dd18c47d8114';
+const FB_ACC         = '2858329897589220';
+const GADS_ACC       = '159-714-9501';
+const GA4_ACC        = '379550350';
 
-async function get(connector, fields, account, extra) {
-  const p = new URLSearchParams({ api_key: KEY, fields: fields.join(',') });
-  p.append('accounts[]', account);
-  Object.entries(extra).forEach(([k,v]) => p.set(k,v));
-  const r = await fetch(`${BASE}/${connector}?${p}`);
-  const d = await r.json();
-  return Array.isArray(d) ? d : (d.data || []);
+async function askWindsor(prompt) {
+  const res = await fetch(ANTHROPIC_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8000,
+      system: `You are a data analyst. Use Windsor.ai MCP tools to fetch data and return ONLY valid JSON. No markdown, no explanation, just the JSON object.`,
+      messages: [{ role: 'user', content: prompt }],
+      mcp_servers: [{
+        type: 'url',
+        url: 'https://mcp.windsor.ai',
+        name: 'windsor-mcp',
+        authorization_token: WINDSOR_KEY
+      }]
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Anthropic API error ${res.status}: ${err.slice(0,200)}`);
+  }
+
+  const data = await res.json();
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('Sem JSON: ' + text.slice(0,300));
+  return JSON.parse(match[0]);
 }
 
 function sumFB(rows) {
@@ -65,27 +90,40 @@ module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin','*');
   res.setHeader('Content-Type','application/json');
   const { date, period } = req.query;
+
   try {
     if (date) {
-      const [fbR,gR] = await Promise.allSettled([
-        get('facebook',  ['campaign','spend','clicks','impressions','ctr','cpc','reach','frequency'],FB_ACC,  {date_from:date,date_to:date}),
-        get('google_ads',['campaign','spend','clicks','ctr','cpc','conversions'],                   GADS_ACC, {date_from:date,date_to:date})
-      ]);
-      return res.end(JSON.stringify({ok:true,date,
-        fb:   sumFB(fbR.status==='fulfilled'?fbR.value:[]),
-        gads: sumG(gR.status==='fulfilled'?gR.value:[])
+      const result = await askWindsor(
+        `Use Windsor.ai MCP to fetch data for date ${date}.
+Call get_data twice:
+1. connector="facebook" accounts=["${FB_ACC}"] date_from="${date}" date_to="${date}" fields=["campaign","spend","clicks","impressions","ctr","cpc","reach","frequency"]
+2. connector="google_ads" accounts=["${GADS_ACC}"] date_from="${date}" date_to="${date}" fields=["campaign","spend","clicks","ctr","cpc","conversions"]
+
+Return ONLY:
+{"fb_rows":[{"campaign":"","spend":0,"clicks":0,"impressions":0,"ctr":0,"cpc":0,"reach":0}],"gads_rows":[{"campaign":"","spend":0,"clicks":0,"conversions":0,"cpc":0}]}`
+      );
+      return res.end(JSON.stringify({ok:true, date,
+        fb:   sumFB(result.fb_rows||[]),
+        gads: sumG(result.gads_rows||[])
       }));
+
     } else if (period) {
-      const [fbR,gR,ga4R] = await Promise.allSettled([
-        get('facebook',        ['date','campaign','spend','clicks','impressions','ctr','cpc'],          FB_ACC,  {date_preset:period}),
-        get('google_ads',      ['date','campaign','spend','clicks','conversions','cpc'],                GADS_ACC,{date_preset:period}),
-        get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],GA4_ACC,{date_preset:period})
-      ]);
-      return res.end(JSON.stringify({ok:true,period,
-        fb:   fbR.status==='fulfilled'?sumFB(fbR.value):null,
-        gads: gR.status==='fulfilled'?sumG(gR.value):null,
-        ga4:  ga4R.status==='fulfilled'?sumGA4(ga4R.value):null
+      const result = await askWindsor(
+        `Use Windsor.ai MCP to fetch data for period "${period}".
+Call get_data three times:
+1. connector="facebook" accounts=["${FB_ACC}"] date_preset="${period}" fields=["date","campaign","spend","clicks","impressions","ctr","cpc"]
+2. connector="google_ads" accounts=["${GADS_ACC}"] date_preset="${period}" fields=["date","campaign","spend","clicks","conversions","cpc"]
+3. connector="googleanalytics4" accounts=["${GA4_ACC}"] date_preset="${period}" fields=["date","source","medium","sessions","transactions","totalrevenue","newusers"]
+
+Return ONLY:
+{"fb_rows":[{"date":"","campaign":"","spend":0,"clicks":0,"ctr":0,"cpc":0}],"gads_rows":[{"date":"","campaign":"","spend":0,"clicks":0,"conversions":0,"cpc":0}],"ga4_rows":[{"date":"","source":"","medium":"","sessions":0,"transactions":0,"totalrevenue":0,"newusers":0}]}`
+      );
+      return res.end(JSON.stringify({ok:true, period,
+        fb:   sumFB(result.fb_rows||[]),
+        gads: sumG(result.gads_rows||[]),
+        ga4:  sumGA4(result.ga4_rows||[])
       }));
+
     } else {
       return res.status(400).end(JSON.stringify({ok:false,error:'Faltou date ou period'}));
     }
