@@ -266,7 +266,7 @@ const N=n=>n==null?'—':Math.round(n).toLocaleString('pt-BR');
 const P=n=>n==null?'—':(n*100).toFixed(2)+'%';
 const X=n=>(!n||n<=0)?'—':n.toFixed(2)+'x';
 const roasCls=r=>!r?'muted':r>=3?'green':r>=1.5?'amber':'';
-const todayStr=new Date().toISOString().slice(0,10);
+const todayStr=new Date(Date.now()-3*60*60*1000).toISOString().slice(0,10);
 
 let currentTab='hoje';
 let data={today:null,'7d':null,'30d':null,'gads':null};
