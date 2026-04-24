@@ -339,11 +339,13 @@ function renderToday(){
   const fbRoasAvg=fbCamps.filter(c=>c.roas).length?fbCamps.filter(c=>c.roas).reduce((s,c)=>s+c.roas,0)/fbCamps.filter(c=>c.roas).length:null;
   const gRoasVal=ga.totalRoas||null;
 
+  const cac=(m.orders&&tot>0)?tot/m.orders:null;
   document.getElementById('todayKpis').innerHTML=kpiHtml([
     {l:'Faturamento',v:m.rev?R(m.rev):'—',s:'Magazord',c:m.rev?'green':'muted'},
     {l:'Vendas',v:m.orders?N(m.orders):'—',s:'pedidos',c:m.orders?'':'muted'},
     {l:'Ticket médio',v:ticket?R(ticket):'—',s:'receita ÷ vendas',c:ticket?'':'muted'},
     {l:'ROAS geral',v:roas?X(roas):'—',s:'faturamento ÷ gasto',c:rc},
+    {l:'CAC',v:cac?R(cac):'—',s:'custo por venda',c:cac?cac<100?'green':cac<200?'amber':'':'muted'},
     {l:'Meta Ads',v:fbS>0?R(fbS):'...',s:N(fbC)+' cliques · alcance '+N(fbR2),c:'blue'},
     {l:'Google Ads',v:gS>0?R(gS):'...',s:N(gC)+' cliques · '+Math.round(gV)+' conv.',c:''},
   ]);
@@ -390,10 +392,12 @@ function renderPeriodData(tab){
   const fbRoasAvg=fbCamps.filter(c=>c.roas).length?fbCamps.filter(c=>c.roas).reduce((s,c)=>s+c.roas,0)/fbCamps.filter(c=>c.roas).length:null;
   const gRoasVal=ga?.totalRoas||null;
 
+  const cac=(orders&&tot>0)?tot/orders:null;
   document.getElementById('kpis'+tab).innerHTML=kpiHtml([
     {l:'Faturamento',v:R(rev),s:revLabel+' · '+N(orders)+' pedidos',c:m.rev!=null?'green':''},
     {l:'ROAS geral',v:X(roas),s:'receita ÷ investimento',c:rc},
     {l:'Ticket médio',v:ticket?R(ticket):'—',s:'faturamento ÷ pedidos',c:ticket?'':'muted'},
+    {l:'CAC',v:cac?R(cac):'—',s:'custo por venda',c:cac?cac<100?'green':cac<200?'amber':'':'muted'},
     {l:'Investimento',v:R(tot),s:'Meta + Google Ads',c:''},
     {l:'Meta Ads',v:R(fbS),s:N(fb?.totalClicks)+' cliques · '+N(fb?.totalReach)+' alcance',c:'blue'},
     {l:'Google Ads',v:R(gS),s:N(ga?.totalConversions)+' conv.',c:''},
