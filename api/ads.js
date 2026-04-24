@@ -47,22 +47,16 @@ function sumFB(rows) {
   (rows||[]).filter(r=>(parseFloat(r.spend)||0)>0).forEach(r=>{
     const n=r.campaign_name||r.campaign||'?';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,ctr:0,cpc:0,cpm:0,reach:0,frequency:0,roas:null};
-    camps[n].spend    += parseFloat(r.spend)||0;
-    camps[n].clicks   += parseFloat(r.clicks)||0;
-    camps[n].ctr       = parseFloat(r.ctr)||0;
-    camps[n].cpc       = parseFloat(r.cpc)||0;
-    camps[n].cpm       = parseFloat(r.cpm)||0;
-    camps[n].reach    += parseFloat(r.reach)||0;
-    camps[n].frequency = parseFloat(r.frequency)||0;
-    camps[n].roas      = extractMetaRoas(r.purchase_roas);
-    spend += parseFloat(r.spend)||0;
-    clicks+= parseFloat(r.clicks)||0;
-    reach += parseFloat(r.reach)||0;
-    impr  += parseFloat(r.impressions)||0;
+    camps[n].spend+=parseFloat(r.spend)||0;camps[n].clicks+=parseFloat(r.clicks)||0;
+    camps[n].ctr=parseFloat(r.ctr)||0;camps[n].cpc=parseFloat(r.cpc)||0;
+    camps[n].cpm=parseFloat(r.cpm)||0;camps[n].reach+=parseFloat(r.reach)||0;
+    camps[n].frequency=parseFloat(r.frequency)||0;
+    camps[n].roas=extractMetaRoas(r.purchase_roas);
+    spend+=parseFloat(r.spend)||0;clicks+=parseFloat(r.clicks)||0;
+    reach+=parseFloat(r.reach)||0;impr+=parseFloat(r.impressions)||0;
   });
-  const fbRoasAvg = Object.values(camps).filter(c=>c.roas).length
-    ? Object.values(camps).filter(c=>c.roas).reduce((s,c)=>s+c.roas,0)/Object.values(camps).filter(c=>c.roas).length
-    : null;
+  const fbRoasAvg=Object.values(camps).filter(c=>c.roas).length
+    ?Object.values(camps).filter(c=>c.roas).reduce((s,c)=>s+c.roas,0)/Object.values(camps).filter(c=>c.roas).length:null;
   return {totalSpend:spend,totalClicks:clicks,totalReach:reach,totalImpressions:impr,avgRoas:fbRoasAvg,
     campaigns:Object.values(camps).sort((a,b)=>b.spend-a.spend)};
 }
@@ -72,24 +66,20 @@ function sumG(rows) {
   (rows||[]).filter(r=>(parseFloat(r.spend)||0)>0).forEach(r=>{
     const n=r.campaign||'?';
     if(!camps[n])camps[n]={name:n,spend:0,clicks:0,conversions:0,conversionValue:0,cpc:0,roas:null};
-    camps[n].spend          += parseFloat(r.spend)||0;
-    camps[n].clicks         += parseFloat(r.clicks)||0;
-    camps[n].conversions    += parseFloat(r.conversions)||0;
-    camps[n].conversionValue+= parseFloat(r.conversion_value)||0;
-    camps[n].cpc             = parseFloat(r.cpc)||0;
-    spend   += parseFloat(r.spend)||0;
-    clicks  += parseFloat(r.clicks)||0;
-    conv    += parseFloat(r.conversions)||0;
-    convVal += parseFloat(r.conversion_value)||0;
+    camps[n].spend+=parseFloat(r.spend)||0;camps[n].clicks+=parseFloat(r.clicks)||0;
+    camps[n].conversions+=parseFloat(r.conversions)||0;
+    camps[n].conversionValue+=parseFloat(r.conversion_value)||0;
+    camps[n].cpc=parseFloat(r.cpc)||0;
+    spend+=parseFloat(r.spend)||0;clicks+=parseFloat(r.clicks)||0;
+    conv+=parseFloat(r.conversions)||0;convVal+=parseFloat(r.conversion_value)||0;
   });
-  const totalRoas = spend>0&&convVal>0 ? convVal/spend : null;
+  const totalRoas=spend>0&&convVal>0?convVal/spend:null;
   return {totalSpend:spend,totalClicks:clicks,totalConversions:conv,totalConversionValue:convVal,totalRoas,
     campaigns:Object.values(camps).map(c=>({...c,roas:c.conversionValue>0&&c.spend>0?c.conversionValue/c.spend:null})).sort((a,b)=>b.spend-a.spend)};
 }
 
 function sumGA4(rows) {
-  const ch={},byDay={};
-  let rev=0,tx=0,sess=0,newu=0;
+  const ch={},byDay={};let rev=0,tx=0,sess=0,newu=0;
   (rows||[]).forEach(r=>{
     const src=(r.source||'').toLowerCase(),med=(r.medium||'').toLowerCase();
     let c='Outros';
@@ -100,11 +90,8 @@ function sumGA4(rows) {
     else if(med==='organic')c='Orgânico';
     else if(src==='edrone'||med==='email')c='Email';
     if(!ch[c])ch[c]={name:c,revenue:0,transactions:0,sessions:0};
-    ch[c].revenue+=parseFloat(r.totalrevenue)||0;
-    ch[c].transactions+=parseFloat(r.transactions)||0;
-    ch[c].sessions+=parseFloat(r.sessions)||0;
-    rev+=parseFloat(r.totalrevenue)||0;tx+=parseFloat(r.transactions)||0;
-    sess+=parseFloat(r.sessions)||0;newu+=parseFloat(r.newusers)||0;
+    ch[c].revenue+=parseFloat(r.totalrevenue)||0;ch[c].transactions+=parseFloat(r.transactions)||0;ch[c].sessions+=parseFloat(r.sessions)||0;
+    rev+=parseFloat(r.totalrevenue)||0;tx+=parseFloat(r.transactions)||0;sess+=parseFloat(r.sessions)||0;newu+=parseFloat(r.newusers)||0;
     if(r.date){const d=r.date.slice(0,10);if(!byDay[d])byDay[d]={date:d,revenue:0,transactions:0};byDay[d].revenue+=parseFloat(r.totalrevenue)||0;byDay[d].transactions+=parseFloat(r.transactions)||0;}
   });
   return {totalRevenue:rev,totalTransactions:tx,totalSessions:sess,totalNewUsers:newu,
