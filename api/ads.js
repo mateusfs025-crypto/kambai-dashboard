@@ -4,7 +4,6 @@ const GA4_ACC  = '379550350';
 const FB_ACC   = '2858329897589220';
 const BASE     = 'https://connectors.windsor.ai';
 const META_BASE = 'https://graph.facebook.com/v19.0';
-const SHEETS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRSMIOGrAgUGPoG1di7PY8mlUnmrZ1c0bkJYCTC2eTYm0G92ob548FNqI6WhNFFk5Ykc8sJDSRNUuHG/pub?gid=0&single=true&output=csv';
 
 async function fetchMeta(date) {
   const token = process.env.METATOKEN;
@@ -26,43 +25,6 @@ async function fetchMetaPeriod(dateFrom, dateTo) {
   const d = await r.json();
   if (d.error) throw new Error('Meta API: ' + d.error.message);
   return (d.data || []);
-}
-
-async function fetchGoogleSheets(date) {
-  const r = await fetch(SHEETS_URL);
-  const text = await r.text();
-  const lines = text.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
-  const rows = lines.slice(1).filter(l=>l.trim()).map(line => {
-    const vals = [];
-    let cur='', inQ=false;
-    for(let i=0;i<line.length;i++){
-      if(line[i]==='"')inQ=!inQ;
-      else if(line[i]===','&&!inQ){vals.push(cur.trim());cur='';}
-      else cur+=line[i];
-    }
-    vals.push(cur.trim());
-    const row={};
-    headers.forEach((h,i)=>row[h]=(vals[i]||'').replace(/"/g,'').trim());
-    return row;
-  });
-  // Filtra pelo dia de hoje
-  const todayRows = rows.filter(r => (r.date||'').slice(0,10) === date);
-  const camps={};let spend=0,clicks=0,conv=0,convVal=0;
-  (todayRows.length ? todayRows : rows).forEach(r=>{
-    const n=r.campaign||'?';
-    const s=parseFloat(r.cost)||0;
-    const c=parseFloat(r.clicks)||0;
-    const cv=parseFloat(r.conversions)||0;
-    const cvv=parseFloat(r.conversion_value)||0;
-    const cpc=parseFloat(r.cpc)||0;
-    if(!camps[n])camps[n]={name:n,spend:0,clicks:0,conversions:0,conversionValue:0,cpc:0};
-    camps[n].spend+=s;camps[n].clicks+=c;camps[n].conversions+=cv;camps[n].conversionValue+=cvv;camps[n].cpc=cpc;
-    spend+=s;clicks+=c;conv+=cv;convVal+=cvv;
-  });
-  const totalRoas=spend>0&&convVal>0?convVal/spend:null;
-  return {totalSpend:spend,totalClicks:clicks,totalConversions:conv,totalConversionValue:convVal,totalRoas,
-    campaigns:Object.values(camps).map(c=>({...c,roas:c.conversionValue>0&&c.spend>0?c.conversionValue/c.spend:null})).sort((a,b)=>b.spend-a.spend)};
 }
 
 async function get(connector, fields, account, extra) {
@@ -146,13 +108,14 @@ module.exports = async function(req, res) {
 
   try {
     if (date) {
-      const [metaR, gadsR] = await Promise.allSettled([
+      // Meta direto + Google Windsor com date_from/date_to
+      const [metaR, gR] = await Promise.allSettled([
         fetchMeta(date),
-        fetchGoogleSheets(date)
+        get('google_ads',['campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],GADS_ACC,{date_from:date,date_to:date})
       ]);
       return res.end(JSON.stringify({ok:true, date,
         fb:   sumFB(metaR.status==='fulfilled' ? metaR.value : []),
-        gads: gadsR.status==='fulfilled' ? gadsR.value : {totalSpend:0,totalClicks:0,totalConversions:0,totalConversionValue:0,totalRoas:null,campaigns:[]}
+        gads: sumG(gR.status==='fulfilled' ? gR.value : [])
       }));
 
     } else if (period) {
