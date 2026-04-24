@@ -8,7 +8,8 @@ const META_BASE = 'https://graph.facebook.com/v19.0';
 async function fetchMeta(date) {
   const token = process.env.METATOKEN;
   const fields = 'campaign_name,spend,clicks,impressions,ctr,cpc,cpm,reach,frequency,purchase_roas';
-  const url = `${META_BASE}/act_${FB_ACC}/insights?fields=${fields}&time_range={"since":"${date}","until":"${date}"}&level=campaign&limit=100&access_token=${token}`;
+  const timeRange = encodeURIComponent(JSON.stringify({since: date, until: date}));
+  const url = `${META_BASE}/act_${FB_ACC}/insights?fields=${fields}&time_range=${timeRange}&level=campaign&limit=100&access_token=${token}`;
   const r = await fetch(url);
   const d = await r.json();
   if (d.error) throw new Error('Meta API: ' + d.error.message);
@@ -18,7 +19,8 @@ async function fetchMeta(date) {
 async function fetchMetaPeriod(dateFrom, dateTo) {
   const token = process.env.METATOKEN;
   const fields = 'campaign_name,spend,clicks,impressions,ctr,cpc,cpm,reach,frequency,purchase_roas';
-  const url = `${META_BASE}/act_${FB_ACC}/insights?fields=${fields}&time_range={"since":"${dateFrom}","until":"${dateTo}"}&level=campaign&limit=100&access_token=${token}`;
+  const timeRange = encodeURIComponent(JSON.stringify({since: dateFrom, until: dateTo}));
+  const url = `${META_BASE}/act_${FB_ACC}/insights?fields=${fields}&time_range=${timeRange}&level=campaign&limit=100&access_token=${token}`;
   const r = await fetch(url);
   const d = await r.json();
   if (d.error) throw new Error('Meta API: ' + d.error.message);
@@ -113,7 +115,6 @@ module.exports = async function(req, res) {
       const metaRows = metaR.status==='fulfilled' ? metaR.value : [];
       const gAll     = gR.status==='fulfilled'    ? gR.value   : [];
       const todayG   = gAll.filter(r=>(r.date||'').slice(0,10)===date&&(parseFloat(r.spend)||0)>0);
-
       return res.end(JSON.stringify({ok:true, date,
         fb:   sumFB(metaRows),
         gads: sumG(todayG.length ? todayG : gAll)
@@ -124,13 +125,11 @@ module.exports = async function(req, res) {
       const dateTo   = new Date(); dateTo.setDate(dateTo.getDate()-1);
       const dateFrom = new Date(); dateFrom.setDate(dateFrom.getDate()-days);
       const fmt = d => d.toISOString().slice(0,10);
-
       const [metaR, gR, ga4R] = await Promise.allSettled([
         fetchMetaPeriod(fmt(dateFrom), fmt(dateTo)),
         get('google_ads',      ['date','campaign','spend','clicks','ctr','cpc','conversions','conversion_value','roas'],GADS_ACC,{date_preset:period}),
-        get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],          GA4_ACC, {date_preset:period})
+        get('googleanalytics4',['date','source','medium','sessions','transactions','totalrevenue','newusers'],GA4_ACC,{date_preset:period})
       ]);
-
       return res.end(JSON.stringify({ok:true, period,
         fb:   metaR.status==='fulfilled'  ? sumFB(metaR.value)  : null,
         gads: gR.status==='fulfilled'     ? sumG(gR.value)      : null,
